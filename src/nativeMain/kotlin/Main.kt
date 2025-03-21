@@ -12,10 +12,13 @@ private val PrettyPrintJson = Json {
     prettyPrint = true
 }
 
+fun String.countDistinctCharacters() = lowercase().toList().distinct().count()
+
 fun main() {
-    val message = Message(
-        topic = "Kotlin/Native",
-        content = "Hello!"
-    )
-    println(PrettyPrintJson.encodeToString(message))
+    println("Hello, enter your name:")
+    val name = readln()
+    name.replace(" ", "").let {
+        println("Your name contains ${it.length} letters")
+        println("Your name contains ${it.countDistinctCharacters()} unique letters")
+    }
 }
