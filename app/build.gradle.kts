@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.tubesmobile.purrytify"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.tubesmobile.purrytify"
-        minSdk = 24
-        targetSdk = 35
+        minSdk = 29
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
