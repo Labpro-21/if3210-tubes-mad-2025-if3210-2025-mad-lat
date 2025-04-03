@@ -16,11 +16,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 
 @Composable
-fun LoginScreen(modifier: Modifier = Modifier) {
+fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -147,7 +149,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
             // LOGIN BUTTON
             Button(
-                onClick = { /* Handle login */ },
+                onClick = { navController.navigate("home") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -178,7 +180,8 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
+    val navController = rememberNavController()
     PurrytifyTheme {
-        LoginScreen()
+        LoginScreen(Modifier, navController)
     }
 }

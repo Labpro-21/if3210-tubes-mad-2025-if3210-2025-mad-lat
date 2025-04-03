@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,51 +20,74 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.ui.components.Screen
+import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
-fun HomeScreen() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "New songs",
-            color = MaterialTheme.colorScheme.onBackground, 
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+fun HomeScreen(navController: NavHostController) {
+    val currentScreen = remember { mutableStateOf(Screen.HOME) }
 
-        LazyRow(
-            modifier = Modifier.padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(newSongs) { song ->
-                NewSongItem(song = song)
-            }
+    Scaffold(
+        bottomBar = {
+            SharedBottomNavigationBar(
+                currentScreen = currentScreen.value,
+                onNavigate = { screen ->
+                    currentScreen.value = screen
+                    when (screen) {
+                        Screen.HOME -> {} 
+                        Screen.LIBRARY -> navController.navigate("library")
+                        Screen.PROFILE -> navController.navigate("profile")
+                    }
+                }
+            )
         }
-
-        Text(
-            text = "Recently played",
-            color = MaterialTheme.colorScheme.onBackground, 
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(innerPadding)
+                .padding(16.dp)
         ) {
-            items(recentlyPlayed) { song ->
-                RecentlyPlayedItem(song = song)
-            }
-        }
+            Text(
+                text = "New songs",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
 
-        BottomPlayerBar()
+            LazyRow(
+                modifier = Modifier.padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(newSongs) { song ->
+                    NewSongItem(song = song)
+                }
+            }
+
+            Text(
+                text = "Recently played",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(recentlyPlayed) { song ->
+                    RecentlyPlayedItem(song = song)
+                }
+            }
+
+            BottomPlayerBar()
+        }
     }
 }
 
@@ -82,13 +107,13 @@ fun NewSongItem(song: Song) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = song.title,
-            color = MaterialTheme.colorScheme.onBackground, 
+            color = MaterialTheme.colorScheme.onBackground,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
         Text(
             text = song.artist,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, 
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
     }
@@ -113,13 +138,13 @@ fun RecentlyPlayedItem(song: Song) {
         Column {
             Text(
                 text = song.title,
-                color = MaterialTheme.colorScheme.onBackground, 
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(
                 text = song.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
         }
@@ -131,7 +156,7 @@ fun BottomPlayerBar() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant) 
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -148,13 +173,13 @@ fun BottomPlayerBar() {
         ) {
             Text(
                 text = "Starboy",
-                color = MaterialTheme.colorScheme.onSurface, 
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(
                 text = "The Weeknd, Da...",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -162,7 +187,7 @@ fun BottomPlayerBar() {
             Icon(
                 painter = painterResource(id = android.R.drawable.ic_media_play),
                 contentDescription = "Play/Pause",
-                tint = MaterialTheme.colorScheme.onSurface 
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -188,7 +213,8 @@ val recentlyPlayed = listOf(
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
+    val navController = rememberNavController()
     PurrytifyTheme {
-        HomeScreen()
+        HomeScreen(navController)
     }
 }
