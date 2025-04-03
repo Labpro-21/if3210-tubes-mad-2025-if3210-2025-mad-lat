@@ -27,7 +27,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -60,14 +60,14 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
             Text(
                 text = "Millions of Songs.",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
                 text = "Only on Purritify.",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -77,7 +77,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             // EMAIL INPUT
             Text(
                 text = "Email",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 modifier = Modifier
                     .align(Alignment.Start)
@@ -90,13 +90,13 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                 placeholder = { Text("Email") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.Gray,
-                    focusedBorderColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedTextColor = Color.White,
-                    cursorColor = Color.White,
-                    unfocusedPlaceholderColor = Color.Gray,
-                    focusedPlaceholderColor = Color.Gray
+                    unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
+                    focusedBorderColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.secondary,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.secondary
                 ),
                 shape = RoundedCornerShape(4.dp),
                 singleLine = true
@@ -107,7 +107,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             // PASSWORD INPUT
             Text(
                 text = "Password",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 modifier = Modifier
                     .align(Alignment.Start)
@@ -124,19 +124,19 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Text(
                             text = if (passwordVisible) "Hide" else "Show",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontSize = 12.sp
                         )
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.Gray,
-                    focusedBorderColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedTextColor = Color.White,
-                    cursorColor = Color.White,
-                    unfocusedPlaceholderColor = Color.Gray,
-                    focusedPlaceholderColor = Color.Gray
+                    unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
+                    focusedBorderColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.secondary,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.secondary
                 ),
                 shape = RoundedCornerShape(4.dp),
                 singleLine = true
@@ -151,13 +151,13 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1DB954)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Text(
                     text = "Log In",
-                    color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -165,7 +165,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.secondary,
                 thickness = 1.dp,
                 modifier = Modifier
                     .fillMaxWidth(0.5f)
