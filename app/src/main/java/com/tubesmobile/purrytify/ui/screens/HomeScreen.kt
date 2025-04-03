@@ -23,19 +23,17 @@ fun HomeScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background) // Mengganti Color.Black
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
-        // Header: New Songs
         Text(
             text = "New songs",
-            color = MaterialTheme.colorScheme.onBackground, // Mengganti Color.White
+            color = MaterialTheme.colorScheme.onBackground, 
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Horizontal Scroll for New Songs
         LazyRow(
             modifier = Modifier.padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -45,16 +43,14 @@ fun HomeScreen() {
             }
         }
 
-        // Header: Recently Played
         Text(
             text = "Recently played",
-            color = MaterialTheme.colorScheme.onBackground, // Mengganti Color.White
+            color = MaterialTheme.colorScheme.onBackground, 
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Vertical Scroll for Recently Played
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -64,7 +60,6 @@ fun HomeScreen() {
             }
         }
 
-        // Bottom Player Bar
         BottomPlayerBar()
     }
 }
@@ -85,13 +80,13 @@ fun NewSongItem(song: Song) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = song.title,
-            color = MaterialTheme.colorScheme.onBackground, // Mengganti Color.White
+            color = MaterialTheme.colorScheme.onBackground, 
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
         Text(
             text = song.artist,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, // Mengganti Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant, 
             fontSize = 12.sp
         )
     }
@@ -116,13 +111,13 @@ fun RecentlyPlayedItem(song: Song) {
         Column {
             Text(
                 text = song.title,
-                color = MaterialTheme.colorScheme.onBackground, // Mengganti Color.White
+                color = MaterialTheme.colorScheme.onBackground, 
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(
                 text = song.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, // Mengganti Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                 fontSize = 14.sp
             )
         }
@@ -134,7 +129,7 @@ fun BottomPlayerBar() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant) // Mengganti Color(0xFF2A1B1B)
+            .background(MaterialTheme.colorScheme.surfaceVariant) 
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -151,13 +146,13 @@ fun BottomPlayerBar() {
         ) {
             Text(
                 text = "Starboy",
-                color = MaterialTheme.colorScheme.onSurface, // Mengganti Color.White
+                color = MaterialTheme.colorScheme.onSurface, 
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(
                 text = "The Weeknd, Da...",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, // Mengganti Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
                 fontSize = 12.sp
             )
         }
@@ -165,16 +160,14 @@ fun BottomPlayerBar() {
             Icon(
                 painter = painterResource(id = android.R.drawable.ic_media_play),
                 contentDescription = "Play/Pause",
-                tint = MaterialTheme.colorScheme.onSurface // Mengganti Color.White
+                tint = MaterialTheme.colorScheme.onSurface 
             )
         }
     }
 }
 
-// Data Models
 data class Song(val title: String, val artist: String, val imageRes: Int)
 
-// Sample Data
 val newSongs = listOf(
     Song("Starboy", "The Weeknd, Da...", R.drawable.ic_launcher_foreground),
     Song("Here Comes T...", "The Beatles", R.drawable.ic_launcher_foreground),
