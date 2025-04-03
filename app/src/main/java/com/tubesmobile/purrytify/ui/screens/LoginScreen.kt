@@ -52,9 +52,9 @@ fun LoginScreen(modifier: Modifier = Modifier) {
 
             // LOGO AND APP TITLE
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Purritify Logo",
-                modifier = Modifier.size(80.dp)
+                modifier = Modifier.size(100.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
