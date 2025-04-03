@@ -14,9 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 
 @Composable
 fun HomeScreen() {
@@ -182,3 +184,11 @@ val recentlyPlayed = listOf(
     Song("Kiss of Life", "Sade", R.drawable.ic_launcher_foreground),
     Song("Best Interest", "Tyler, The Creator", R.drawable.ic_launcher_foreground)
 )
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    PurrytifyTheme {
+        HomeScreen()
+    }
+}

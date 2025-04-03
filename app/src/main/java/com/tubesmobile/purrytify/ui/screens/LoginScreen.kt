@@ -13,9 +13,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier) {
@@ -170,5 +172,13 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                     .fillMaxWidth(0.5f)
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun LoginScreenPreview() {
+    PurrytifyTheme {
+        LoginScreen()
     }
 }
