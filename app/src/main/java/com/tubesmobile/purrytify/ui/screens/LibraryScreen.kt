@@ -24,7 +24,7 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tubesmobile.purrytify.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 
 // SAMPLE DATA
 val songs = listOf(
