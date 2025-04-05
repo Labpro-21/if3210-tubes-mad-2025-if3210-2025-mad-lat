@@ -2,6 +2,7 @@ package com.tubesmobile.purrytify.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,26 +23,21 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.components.Screen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-
-// DATA CLASS TO REPRESENT AN ALBUM
-data class Album(
-    val title: String,
-    val artist: String,
-    val imageResId: Int
-)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tubesmobile.purrytify.viewmodel.MusicViewModel
 
 // SAMPLE DATA
-val albums = listOf(
-    Album("STARBOY", "The Weeknd, Daft Punk", R.drawable.ic_launcher_foreground),
-    Album("Here Comes The Sun - Remaster...", "The Beatles", R.drawable.ic_launcher_foreground),
-    Album("MIDNIGHT PRETENDERS", "Tomoko Aran", R.drawable.ic_launcher_foreground),
-    Album("VIOLENT CRIMES", "Kanye West", R.drawable.ic_launcher_foreground),
-    Album("DENIAL IS A RIVER", "Doechii", R.drawable.ic_launcher_foreground),
-    Album("Doomsday", "MF DOOM, Pebbles The Invisible Girl", R.drawable.ic_launcher_foreground)
+val songs = listOf(
+    Song("STARBOY", "The Weeknd, Daft Punk", R.drawable.ic_launcher_foreground),
+    Song("Here Comes The Sun - Remaster...", "The Beatles", R.drawable.ic_launcher_foreground),
+    Song("MIDNIGHT PRETENDERS", "Tomoko Aran", R.drawable.ic_launcher_foreground),
+    Song("VIOLENT CRIMES", "Kanye West", R.drawable.ic_launcher_foreground),
+    Song("DENIAL IS A RIVER", "Doechii", R.drawable.ic_launcher_foreground),
+    Song("Doomsday", "MF DOOM, Pebbles The Invisible Girl", R.drawable.ic_launcher_foreground)
 )
 
 @Composable
-fun MusicLibraryScreen(navController: NavHostController) {
+fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
 
     Scaffold(
@@ -54,8 +50,10 @@ fun MusicLibraryScreen(navController: NavHostController) {
                         Screen.HOME -> navController.navigate("home")
                         Screen.LIBRARY -> {}
                         Screen.PROFILE -> navController.navigate("profile")
+                        Screen.MUSIC -> {}
                     }
-                }
+                },
+                transparent = false
             )
         }
     ) { innerPadding ->
@@ -104,8 +102,13 @@ fun MusicLibraryScreen(navController: NavHostController) {
                     .weight(1f)
                     .padding(horizontal = 16.dp)
             ) {
-                items(albums) { album ->
-                    AlbumItem(album = album)
+                items(songs) { song ->
+                    SongItem(
+                        song = song,
+                        onClick = { selectedSong ->
+                            musicViewModel.playSong(selectedSong)
+                            navController.navigate("music/${Screen.LIBRARY.name}")
+                        })
                 }
             }
         }
@@ -132,16 +135,17 @@ fun TabButton(text: String, isSelected: Boolean) {
 }
 
 @Composable
-fun AlbumItem(album: Album) {
+fun SongItem(song: Song, onClick: (Song) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick(song) }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(id = album.imageResId),
-            contentDescription = album.title,
+            painter = painterResource(id = song.imageRes),
+            contentDescription = song.title,
             modifier = Modifier
                 .size(56.dp)
         )
@@ -152,13 +156,13 @@ fun AlbumItem(album: Album) {
                 .weight(1f)
         ) {
             Text(
-                text = album.title,
+                text = song.title,
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = album.artist,
+                text = song.artist,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp
             )
@@ -166,82 +170,13 @@ fun AlbumItem(album: Album) {
     }
 }
 
-@Composable
-fun BottomNavigationBar() {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-    ) {
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* Handle Home click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_home_inactive),
-                    contentDescription = "Home",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            label = {
-                Text(
-                    text = "Home",
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
-        NavigationBarItem(
-            selected = true,
-            onClick = { /* Handle Library click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_library_active),
-                    contentDescription = "Your Library",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            },
-            label = {
-                Text(
-                    text = "Your Library",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* Handle Profile click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_profile_inactive),
-                    contentDescription = "Profile",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            label = {
-                Text(
-                    text = "Profile",
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 fun MusicLibraryScreenPreview() {
     val navController = rememberNavController()
+    val previewViewModel: MusicViewModel = viewModel()
+
     PurrytifyTheme {
-        MusicLibraryScreen(navController)
+        MusicLibraryScreen(navController, previewViewModel)
     }
 }

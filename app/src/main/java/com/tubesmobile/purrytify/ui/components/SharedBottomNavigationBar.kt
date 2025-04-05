@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import com.tubesmobile.purrytify.R
@@ -11,22 +12,28 @@ import com.tubesmobile.purrytify.R
 enum class Screen {
     HOME,
     LIBRARY,
-    PROFILE
+    PROFILE,
+    MUSIC
 }
 
 @Composable
 fun SharedBottomNavigationBar(
     currentScreen: Screen,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    transparent: Boolean
 ) {
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = if (!transparent)
+                            MaterialTheme.colorScheme.surface
+                         else
+                            Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         NavigationBarItem(
             selected = currentScreen == Screen.HOME,
             onClick = { onNavigate(Screen.HOME) },
-            icon = {
+            icon =
+                {
                 Icon(
                     painter = painterResource(
                         id = if (currentScreen == Screen.HOME)
@@ -55,7 +62,7 @@ fun SharedBottomNavigationBar(
                 )
             },
             colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
+                indicatorColor = Color.Transparent
             )
         )
 
@@ -91,7 +98,8 @@ fun SharedBottomNavigationBar(
                 )
             },
             colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
+                indicatorColor = Color.Transparent
+
             )
         )
 
