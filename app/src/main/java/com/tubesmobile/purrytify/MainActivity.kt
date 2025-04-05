@@ -16,7 +16,7 @@ import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
-import com.tubesmobile.purrytify.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 
 class MainActivity : ComponentActivity() {
     private val musicViewModel by viewModels<MusicViewModel>()

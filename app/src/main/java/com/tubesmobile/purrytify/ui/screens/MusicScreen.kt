@@ -38,7 +38,7 @@ import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
-import com.tubesmobile.purrytify.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 
 @Composable
 fun MusicScreen(
