@@ -9,17 +9,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.tubesmobile.purrytify.PurrytifyNavHost
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
@@ -41,8 +38,10 @@ fun ProfileScreen(navController: NavHostController) {
                         Screen.HOME -> navController.navigate("home")
                         Screen.LIBRARY -> navController.navigate("library")
                         Screen.PROFILE -> {}
+                        Screen.MUSIC -> {}
                     }
-                }
+                },
+                transparent = false
             )
         }
     ) { innerPadding -> 
@@ -148,7 +147,7 @@ fun StatItem(label: String, value: String) {
 @Composable
 fun ProfileScreenPreview() {
     val navController = rememberNavController()
-    PurrytifyTheme() {
+    PurrytifyTheme {
         ProfileScreen(navController)
     }
 }

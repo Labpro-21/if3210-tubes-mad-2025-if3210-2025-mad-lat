@@ -2,6 +2,7 @@ package com.tubesmobile.purrytify.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,15 +20,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.tubesmobile.purrytify.viewmodel.MusicViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
 
     Scaffold(
@@ -40,8 +43,10 @@ fun HomeScreen(navController: NavHostController) {
                         Screen.HOME -> {} 
                         Screen.LIBRARY -> navController.navigate("library")
                         Screen.PROFILE -> navController.navigate("profile")
+                        Screen.MUSIC -> navController.navigate("music/${Screen.HOME.name}")
                     }
-                }
+                },
+                transparent = false
             )
         }
     ) { innerPadding ->
@@ -65,7 +70,13 @@ fun HomeScreen(navController: NavHostController) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(newSongs) { song ->
-                    NewSongItem(song = song)
+                    NewSongItem(
+                        song = song,
+                        onClick = { selectedSong ->
+                            musicViewModel.playSong(selectedSong)
+                            navController.navigate("music/${Screen.HOME.name}")
+                        }
+                    )
                 }
             }
 
@@ -82,7 +93,13 @@ fun HomeScreen(navController: NavHostController) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(recentlyPlayed) { song ->
-                    RecentlyPlayedItem(song = song)
+                    RecentlyPlayedItem(
+                        song = song,
+                        onClick = { selectedSong ->
+                            musicViewModel.playSong(selectedSong)
+                            navController.navigate("music/${Screen.HOME.name}")
+                        }
+                    )
                 }
             }
 
@@ -92,9 +109,11 @@ fun HomeScreen(navController: NavHostController) {
 }
 
 @Composable
-fun NewSongItem(song: Song) {
+fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
     Column(
-        modifier = Modifier.width(120.dp),
+        modifier = Modifier
+            .width(120.dp)
+            .clickable { onClick(song) },
         horizontalAlignment = Alignment.Start
     ) {
         Image(
@@ -120,10 +139,11 @@ fun NewSongItem(song: Song) {
 }
 
 @Composable
-fun RecentlyPlayedItem(song: Song) {
+fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick(song) }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -214,7 +234,9 @@ val recentlyPlayed = listOf(
 @Composable
 fun HomeScreenPreview() {
     val navController = rememberNavController()
+    val previewViewModel: MusicViewModel = viewModel()
+
     PurrytifyTheme {
-        HomeScreen(navController)
+        HomeScreen(navController, previewViewModel)
     }
 }
