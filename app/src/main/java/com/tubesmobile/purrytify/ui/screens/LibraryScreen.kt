@@ -55,7 +55,7 @@ fun MusicLibraryScreen(navController: NavHostController) {
                         Screen.LIBRARY -> {}
                         Screen.PROFILE -> navController.navigate("profile")
                     }
-                }
+                },
             )
         }
     ) { innerPadding ->
@@ -163,77 +163,6 @@ fun AlbumItem(album: Album) {
                 fontSize = 14.sp
             )
         }
-    }
-}
-
-@Composable
-fun BottomNavigationBar() {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .fillMaxWidth()
-    ) {
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* Handle Home click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_home_inactive),
-                    contentDescription = "Home",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            label = {
-                Text(
-                    text = "Home",
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
-        NavigationBarItem(
-            selected = true,
-            onClick = { /* Handle Library click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_library_active),
-                    contentDescription = "Your Library",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            },
-            label = {
-                Text(
-                    text = "Your Library",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { /* Handle Profile click */ },
-            icon = {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_profile_inactive),
-                    contentDescription = "Profile",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            label = {
-                Text(
-                    text = "Profile",
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
-            )
-        )
     }
 }
 
