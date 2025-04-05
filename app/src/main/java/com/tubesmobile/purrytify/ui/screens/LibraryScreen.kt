@@ -1,13 +1,22 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -15,6 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
@@ -23,7 +35,12 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.components.Screen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.Popup
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.tubesmobile.purrytify.viewmodel.MusicViewModel
 
 // SAMPLE DATA
@@ -39,6 +56,7 @@ val songs = listOf(
 @Composable
 fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
+    var showPopup by remember { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
@@ -77,7 +95,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
-                IconButton(onClick = { /* Add action */ }) {
+                IconButton(onClick = { showPopup = true }) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add),
                         contentDescription = "Add",
@@ -112,8 +130,191 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                 }
             }
         }
+        if (showPopup) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.4f))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        showPopup = false
+                    }
+            )
+            SwipeableUpload(onDismiss = { showPopup = false })
+        }
     }
 }
+
+@Composable
+fun SwipeableUpload(onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val offsetY = remember { Animatable(0f) }
+    var title by remember { mutableStateOf("") }
+    var artist by remember { mutableStateOf("") }
+
+    val configuration = LocalConfiguration.current
+    val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.toPx() }
+
+    Popup(
+        onDismissRequest = { onDismiss() },
+        alignment = Alignment.BottomCenter
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(500.dp)
+                .offset { IntOffset(0, offsetY.value.toInt()) }
+                .background(
+                    MaterialTheme.colorScheme.surface,
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
+                ,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(
+                            MaterialTheme.colorScheme.onPrimary,
+                            RoundedCornerShape(2.dp)
+                        )
+                        .draggable(
+                            orientation = Orientation.Vertical,
+                            state = rememberDraggableState { delta ->
+                                scope.launch {
+                                    offsetY.snapTo(offsetY.value + delta)
+                                }
+                            },
+                            onDragStopped = {
+                                scope.launch {
+                                    if (offsetY.value > screenHeightPx * 0.3f) {
+                                        offsetY.animateTo(screenHeightPx, animationSpec = tween(300))
+                                        onDismiss()
+                                    } else {
+                                        offsetY.animateTo(0f, animationSpec = tween(300))
+                                    }
+                                }
+                            }
+                        )
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Upload Song",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    UploadBox(label = "Upload Artwork", modifier = Modifier.weight(1f))
+                    UploadBox(label = "Upload File", modifier = Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Title",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                )
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Artist",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 16.sp,
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                )
+                OutlinedTextField(
+                    value = artist,
+                    onValueChange = { artist = it },
+                    label = { Text("Artist") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(0.8f),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ActionButtonUpload(
+                            label = "Cancel",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        ActionButtonUpload(
+                            label = "Save",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UploadBox(label: String, modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .height(120.dp)
+            .width(120.dp)
+            .border(1.dp, MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(8.dp))
+            .clickable { /* TODO: buka picker */ }
+    ) {
+        Text(text = label)
+    }
+}
+
+@Composable
+fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Color){
+    Button(
+        onClick = {  },
+        modifier = Modifier
+            .height(48.dp)
+            .width(150.dp)
+        ,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+    }
+}
+
 
 @Composable
 fun TabButton(text: String, isSelected: Boolean) {
