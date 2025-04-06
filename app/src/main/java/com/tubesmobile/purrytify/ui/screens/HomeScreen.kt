@@ -27,7 +27,7 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.tubesmobile.purrytify.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 
 @Composable
 fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel) {

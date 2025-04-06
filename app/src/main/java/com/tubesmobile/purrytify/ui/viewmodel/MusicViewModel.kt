@@ -1,4 +1,4 @@
-package com.tubesmobile.purrytify.viewmodel
+package com.tubesmobile.purrytify.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
