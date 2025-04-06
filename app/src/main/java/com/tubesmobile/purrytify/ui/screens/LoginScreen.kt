@@ -16,22 +16,59 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
+import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 
 @Composable
-fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController) {
+fun LoginScreen(navController: NavHostController) {
+    val viewModel: LoginViewModel = viewModel()
+    val loginState by viewModel.loginState.collectAsState()
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is LoginViewModel.LoginState.Success -> {
+                navController.navigate("home") {
+                    popUpTo("login") { inclusive = true }
+                }
+            }
+            is LoginViewModel.LoginState.Error -> {
+                errorMessage = (loginState as LoginViewModel.LoginState.Error).message
+                showError = true
+            }
+            else -> {
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.bg),
+            contentDescription = "Album covers",
+            modifier = Modifier
+                .size(410.dp)
+                .align(Alignment.TopEnd),
+            contentScale = ContentScale.Fit
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -43,14 +80,7 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "Album covers",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
+            )
 
             // LOGO AND APP TITLE
             Image(
@@ -80,6 +110,7 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
             // EMAIL INPUT
             Text(
                 text = "Email",
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 modifier = Modifier
@@ -90,7 +121,7 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                placeholder = { Text("Email") },
+                placeholder = { Text("Enter your email") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
@@ -101,15 +132,14 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.secondary,
                     focusedPlaceholderColor = MaterialTheme.colorScheme.secondary
                 ),
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(8.dp),
                 singleLine = true
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // PASSWORD INPUT
             Text(
                 text = "Password",
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 modifier = Modifier
@@ -117,21 +147,12 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
                     .padding(bottom = 8.dp)
             )
 
+            // PASSWORD INPUT WITH TOGGLE VISIBILITY
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                placeholder = { Text("Password") },
+                placeholder = { Text("Enter your password") },
                 modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Text(
-                            text = if (passwordVisible) "Hide" else "Show",
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontSize = 12.sp
-                        )
-                    }
-                },
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
                     focusedBorderColor = MaterialTheme.colorScheme.onBackground,
@@ -141,15 +162,38 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.secondary,
                     focusedPlaceholderColor = MaterialTheme.colorScheme.secondary
                 ),
-                shape = RoundedCornerShape(4.dp),
-                singleLine = true
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (showError) {
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 14.sp,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // LOGIN BUTTON
             Button(
-                onClick = { navController.navigate("home") },
+                onClick = {
+                    viewModel.login(email, password)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -157,21 +201,28 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(24.dp),
+                enabled = email.isNotBlank() && password.isNotBlank() && loginState !is LoginViewModel.LoginState.Loading
             ) {
-                Text(
-                    text = "Log In",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (loginState is LoginViewModel.LoginState.Loading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Log In",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.secondary,
                 thickness = 1.dp,
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
+                modifier = Modifier.fillMaxWidth(0.5f)
             )
         }
     }
@@ -182,6 +233,6 @@ fun LoginScreen(modifier: Modifier = Modifier, navController: NavHostController)
 fun LoginScreenPreview() {
     val navController = rememberNavController()
     PurrytifyTheme {
-        LoginScreen(Modifier, navController)
+        LoginScreen(navController)
     }
 }
