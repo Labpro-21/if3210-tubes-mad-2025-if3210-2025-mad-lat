@@ -263,7 +263,7 @@ fun MusicScreenPreview() {
     val dummyNavController = rememberNavController()
     val previewViewModel: MusicViewModel = viewModel()
 
-     previewViewModel.playSong(Song("Preview Song", "Preview Artist", R.drawable.ic_launcher_foreground))
+     previewViewModel.playSong(Song("Preview Song", "Preview Artist", 300, "",  R.drawable.ic_launcher_foreground.toString()))
 
     MusicScreen(
         navController = dummyNavController,
