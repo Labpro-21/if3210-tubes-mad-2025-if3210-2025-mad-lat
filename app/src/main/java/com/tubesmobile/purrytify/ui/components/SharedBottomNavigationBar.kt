@@ -20,13 +20,9 @@ enum class Screen {
 fun SharedBottomNavigationBar(
     currentScreen: Screen,
     onNavigate: (Screen) -> Unit,
-    transparent: Boolean
 ) {
     NavigationBar(
-        containerColor = if (!transparent)
-                            MaterialTheme.colorScheme.surface
-                         else
-                            Color.Transparent,
+        containerColor = Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         NavigationBarItem(
