@@ -1,5 +1,11 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -44,6 +50,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -164,15 +173,68 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
 
 @Composable
 fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
+
+    fun shortenFilename(name: String, maxLength: Int = 20): String {
+        return if (name.length <= maxLength) name
+        else name.take(maxLength - 10) + "..." + name.takeLast(7)
+    }
+
     val scope = rememberCoroutineScope()
     val offsetY = remember { Animatable(0f) }
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
+    var duration by remember { mutableStateOf("") }
+    var audioUri by remember { mutableStateOf<Uri?>(null) }
+    var artworkUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedArtwork by remember { mutableStateOf<ImageBitmap?>(null) }
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.toPx() }
     val titleFocusRequester = remember { FocusRequester() }
     val artistFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    val context = LocalContext.current
+
+    var pickedFileName by remember { mutableStateOf<String?>(null) }
+
+    val launcherAudio = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            audioUri = it
+            val cursor = context.contentResolver.query(it, null, null, null, null)
+            cursor?.use { c ->
+                val nameIndex = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (c.moveToFirst()) {
+                    val fileName = c.getString(nameIndex)
+                    pickedFileName = shortenFilename(fileName)
+                }
+            }
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, it)
+
+            title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
+            artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
+
+            val dur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            duration = dur?.let { d -> "${d / 1000 / 60}:${(d / 1000 % 60).toString().padStart(2, '0')}" } ?: ""
+
+            val art = retriever.embeddedPicture
+            art?.let { byteArray ->
+                val bitmap = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+                selectedArtwork = bitmap.asImageBitmap()
+            }
+
+            retriever.release()
+        }
+    }
+
+    val launcherArtwork = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            val stream = context.contentResolver.openInputStream(it)
+            val bitmap = BitmapFactory.decodeStream(stream)
+            stream?.close()
+            selectedArtwork = bitmap?.asImageBitmap()
+        }
+    }
 
     Dialog(
         onDismissRequest = { onDismiss() },
@@ -273,8 +335,22 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        UploadBox(label = "Upload Artwork", modifier = Modifier.weight(1f))
-                        UploadBox(label = "Upload File", modifier = Modifier.weight(1f))
+                        UploadBox(
+                            label = "Upload Artwork",
+                            image = selectedArtwork,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                launcherArtwork.launch("image/*")
+                            }
+                        )
+                        UploadBox(
+                            label = pickedFileName ?: "Upload File",
+                            image = null,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                launcherAudio.launch("audio/*")
+                            }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -322,29 +398,22 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.8f),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ActionButtonUpload(
-                            label = "Cancel",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.secondary,
-                            onClick = { onDismiss() }
-                        )
-                        ActionButtonUpload(
-                            label = "Save",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.primary,
-                            onClick = {
-                                if (title.isNotBlank() && artist.isNotBlank()) {
-                                    val newSong = Song(title, artist, R.drawable.ic_launcher_foreground)
-                                    onAddSong(newSong)
-                                    onDismiss()
-                                }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        ActionButtonUpload("Cancel", color = MaterialTheme.colorScheme.secondary) { onDismiss() }
+                        ActionButtonUpload("Save", color = MaterialTheme.colorScheme.primary) {
+                            if (title.isNotBlank() && artist.isNotBlank() && audioUri != null) {
+                                val newSong = Song(
+                                    title = title,
+                                    artist = artist,
+                                    imageRes = R.drawable.ic_launcher_foreground, // placeholder
+//                                    uri = audioUri.toString(), // assuming you've added a uri field in your Song model
+//                                    artworkUri = artworkUri?.toString(),
+//                                    duration = duration
+                                )
+                                onAddSong(newSong)
+                                onDismiss()
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -354,16 +423,24 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
 
 
 @Composable
-fun UploadBox(label: String, modifier: Modifier = Modifier) {
+fun UploadBox(label: String, image: ImageBitmap?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .height(120.dp)
             .width(120.dp)
             .border(1.dp, MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(8.dp))
-            .clickable { /* TODO: buka picker */ }
+            .clickable { onClick() }
     ) {
-        Text(text = label)
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(text = label)
+        }
     }
 }
 
