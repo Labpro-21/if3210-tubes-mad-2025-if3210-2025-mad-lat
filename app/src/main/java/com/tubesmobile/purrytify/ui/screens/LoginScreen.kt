@@ -25,19 +25,25 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
+import com.tubesmobile.purrytify.util.NetworkConnectivityManager
 
 @Composable
 fun LoginScreen(navController: NavHostController) {
     val viewModel: LoginViewModel = viewModel()
     val loginState by viewModel.loginState.collectAsState()
-
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+
+    val isConnected by LocalNetworkStatus.current.collectAsState()
 
     LaunchedEffect(loginState) {
         when (loginState) {
@@ -189,6 +195,11 @@ fun LoginScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Network status banner
+            if (!isConnected) {
+                NetworkOfflineScreen()
+            }
+
             // LOGIN BUTTON
             Button(
                 onClick = {
@@ -202,8 +213,9 @@ fun LoginScreen(navController: NavHostController) {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(24.dp),
-                enabled = email.isNotBlank() && password.isNotBlank() && loginState !is LoginViewModel.LoginState.Loading
-            ) {
+                enabled = (email.isNotBlank() && password.isNotBlank() &&
+                        loginState !is LoginViewModel.LoginState.Loading &&
+                        isConnected)            ) {
                 if (loginState is LoginViewModel.LoginState.Loading) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.onPrimary,

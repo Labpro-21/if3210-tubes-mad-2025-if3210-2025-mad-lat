@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -14,19 +15,26 @@ import com.tubesmobile.purrytify.ui.screens.HomeScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
 import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 
 class MainActivity : ComponentActivity() {
     private val musicViewModel by viewModels<MusicViewModel>()
+    private val networkViewModel by viewModels<NetworkViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PurrytifyTheme {
-                PurrytifyNavHost(musicViewModel)
+                CompositionLocalProvider(
+                    LocalNetworkStatus provides networkViewModel.isConnected
+                ) {
+                    PurrytifyNavHost(musicViewModel)
+                }
             }
         }
     }
