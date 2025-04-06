@@ -17,12 +17,13 @@ import androidx.compose.ui.unit.dp
 import com.tubesmobile.purrytify.R
 
 @Composable
-fun NetworkOfflineScreen() {
+fun NetworkOfflineScreen(paddingNum: Int) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 16.dp)
+            .padding(horizontal = paddingNum.dp)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

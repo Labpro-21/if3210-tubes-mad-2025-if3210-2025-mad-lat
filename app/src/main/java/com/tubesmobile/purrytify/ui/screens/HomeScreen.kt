@@ -46,7 +46,6 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                         Screen.MUSIC -> navController.navigate("music/${Screen.HOME.name}")
                     }
                 },
-                transparent = false
             )
         }
     ) { innerPadding ->
