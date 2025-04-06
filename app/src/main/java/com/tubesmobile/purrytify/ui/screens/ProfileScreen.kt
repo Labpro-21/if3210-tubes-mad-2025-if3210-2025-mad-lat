@@ -129,115 +129,111 @@ fun ProfileContent(
     val baseUrl = "http://34.101.226.132:3000"  // Base URL from the spec
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/${profile.profilePhoto}"
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color.Transparent // Transparent because we'll use the gradient
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .padding(top = 51.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer)
+        )
+
+        // Profile photo using Coil for network image loading
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(profilePhotoUrl)
+                .crossfade(true)
+                .placeholder(R.drawable.ic_launcher_foreground)
+                .error(R.drawable.ic_launcher_foreground)
+                .build(),
+            contentDescription = "Profile Photo",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // USERNAME
+        Text(
+            text = profile.username,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        // EMAIL
+        Text(
+            text = profile.email,
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+
+        // LOCATION
+        Text(
+            text = profile.location,
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // EDIT PROFILE BUTTON (disabled for now as it's not in the spec)
+        Button(
+            onClick = { /* Handle edit profile click */ },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(0.5f)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 51.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            )
-
-            // Profile photo using Coil for network image loading
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(profilePhotoUrl)
-                    .crossfade(true)
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
-                    .build(),
-                contentDescription = "Profile Photo",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // USERNAME
             Text(
-                text = profile.username,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                text = "Edit Profile",
+                fontSize = 16.sp
             )
+        }
 
-            // EMAIL
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // LOGOUT BUTTON
+        OutlinedButton(
+            onClick = onLogout,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            ),
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(0.5f)
+        ) {
             Text(
-                text = profile.email,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                text = "Logout",
+                fontSize = 16.sp
             )
+        }
 
-            // LOCATION
-            Text(
-                text = profile.location,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
+        Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // EDIT PROFILE BUTTON (disabled for now as it's not in the spec)
-            Button(
-                onClick = { /* Handle edit profile click */ },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth(0.5f)
-            ) {
-                Text(
-                    text = "Edit Profile",
-                    fontSize = 16.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // LOGOUT BUTTON
-            OutlinedButton(
-                onClick = onLogout,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth(0.5f)
-            ) {
-                Text(
-                    text = "Logout",
-                    fontSize = 16.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // STATS
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(label = "SONGS", value = "135")
-                StatItem(label = "LIKED", value = "32")
-                StatItem(label = "LISTENED", value = "50")
-            }
+        // STATS
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatItem(label = "SONGS", value = "135")
+            StatItem(label = "LIKED", value = "32")
+            StatItem(label = "LISTENED", value = "50")
         }
     }
+
 }
 
 @Composable
