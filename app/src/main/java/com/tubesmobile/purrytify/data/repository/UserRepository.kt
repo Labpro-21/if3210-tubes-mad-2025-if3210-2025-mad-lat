@@ -25,7 +25,31 @@ class UserRepository(
         }
     }
 
+    suspend fun getProfile(): Result<ProfileResponse> {
+        val token = tokenManager.getToken() ?: return Result.failure(Exception("No token available"))
 
+        return try {
+            val response = apiService.getProfile("Bearer $token")
+            if (response.isSuccessful) {
+                response.body()?.let {
+                    return Result.success(it)
+                }
+                return Result.failure(Exception("Empty response"))
+            } else if (response.code() == 403) {
+                // Token expired, try to refresh
+                val refreshResult = refreshToken()
+                if (refreshResult.isSuccess) {
+                    // Retry with new token
+                    return getProfile()
+                }
+                Result.failure(Exception("Token expired and refresh failed"))
+            } else {
+                Result.failure(Exception("Failed to get profile: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     suspend fun refreshToken(): Result<Boolean> {
         val refreshToken = tokenManager.getRefreshToken()
