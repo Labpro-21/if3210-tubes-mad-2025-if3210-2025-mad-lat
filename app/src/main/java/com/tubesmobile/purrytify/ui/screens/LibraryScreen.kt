@@ -89,7 +89,6 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                         Screen.MUSIC -> {}
                     }
                 },
-                transparent = false
             )
         }
     ) { innerPadding ->

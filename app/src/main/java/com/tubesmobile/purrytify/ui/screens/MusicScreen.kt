@@ -76,7 +76,6 @@ fun MusicScreen(
                         Screen.MUSIC -> {}
                     }
                 },
-                transparent = true
             )
         }
     ) { innerPadding ->

@@ -197,7 +197,7 @@ fun LoginScreen(navController: NavHostController) {
 
             // Network status banner
             if (!isConnected) {
-                NetworkOfflineScreen()
+                NetworkOfflineScreen(0)
             }
 
             // LOGIN BUTTON
