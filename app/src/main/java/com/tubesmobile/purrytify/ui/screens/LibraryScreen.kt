@@ -48,7 +48,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import com.tubesmobile.purrytify.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 
 // SAMPLE DATA
 val songs = listOf(
