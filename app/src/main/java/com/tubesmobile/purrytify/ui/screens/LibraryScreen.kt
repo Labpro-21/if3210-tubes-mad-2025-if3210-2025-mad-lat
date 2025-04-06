@@ -1,7 +1,5 @@
 package com.tubesmobile.purrytify.ui.screens
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,9 +61,6 @@ val songs = listOf(
 @Composable
 fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
-    var showPopup by remember { mutableStateOf(false) }
-    var songsList by remember { mutableStateOf(songs) }
-
 
     Scaffold(
         bottomBar = {
@@ -104,7 +99,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
-                IconButton(onClick = { showPopup = true }) {
+                IconButton(onClick = { /* Add action */ }) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add),
                         contentDescription = "Add",
@@ -129,7 +124,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                     .weight(1f)
                     .padding(horizontal = 16.dp)
             ) {
-                items(songsList) { song ->
+                items(songs) { song ->
                     SongItem(
                         song = song,
                         onClick = { selectedSong ->
@@ -139,257 +134,8 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                 }
             }
         }
-        if (showPopup) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.4f))
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        showPopup = false
-                    }
-            )
-
-            SwipeableUpload(
-                onDismiss = { showPopup = false },
-                onAddSong = { newSong ->
-                    songsList = songsList + newSong
-                }
-            )
-        }
     }
 }
-
-@Composable
-fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val offsetY = remember { Animatable(0f) }
-    var title by remember { mutableStateOf("") }
-    var artist by remember { mutableStateOf("") }
-    val configuration = LocalConfiguration.current
-    val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.toPx() }
-    val titleFocusRequester = remember { FocusRequester() }
-    val artistFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    Dialog(
-        onDismissRequest = { onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Transparent)
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) {
-                    onDismiss()
-                }
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .height(500.dp)
-                    .offset { IntOffset(0, offsetY.value.toInt()) }
-                    .background(
-                        MaterialTheme.colorScheme.surface,
-                        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                    )
-                    .draggable(
-                        orientation = Orientation.Vertical,
-                        state = rememberDraggableState { delta ->
-                            scope.launch {
-                                val newOffset = offsetY.value + delta
-                                if (newOffset >= 0f) {
-                                    offsetY.snapTo(newOffset)
-                                }
-                            }
-                        },
-                        onDragStopped = {
-                            scope.launch {
-                                if (offsetY.value > screenHeightPx * 0.3f) {
-                                    offsetY.animateTo(screenHeightPx, tween(300))
-                                    onDismiss()
-                                } else {
-                                    offsetY.animateTo(0f, tween(300))
-                                }
-                            }
-                        }
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-
-                    ,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .width(40.dp)
-                            .height(4.dp)
-                            .background(
-                                MaterialTheme.colorScheme.onPrimary,
-                                RoundedCornerShape(2.dp)
-                            )
-                            .draggable(
-                                orientation = Orientation.Vertical,
-                                state = rememberDraggableState { delta ->
-                                    scope.launch {
-                                        val newOffset = offsetY.value + delta
-                                        if (newOffset >= 0f) {
-                                            offsetY.snapTo(newOffset)
-                                        }
-                                    }
-                                },
-                                onDragStopped = {
-                                    scope.launch {
-                                        if (offsetY.value > screenHeightPx * 0.3f) {
-                                            offsetY.animateTo(screenHeightPx, tween(300))
-                                            onDismiss()
-                                        } else {
-                                            offsetY.animateTo(0f, tween(300))
-                                        }
-                                    }
-                                }
-                            )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Upload Song",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        UploadBox(label = "Upload Artwork", modifier = Modifier.weight(1f))
-                        UploadBox(label = "Upload File", modifier = Modifier.weight(1f))
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Title",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 16.sp,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Title") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(titleFocusRequester),
-                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(
-                            onNext = {
-                                artistFocusRequester.requestFocus()
-                            }
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Artist",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 16.sp,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-                    OutlinedTextField(
-                        value = artist,
-                        onValueChange = { artist = it },
-                        label = { Text("Artist") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(artistFocusRequester),
-                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                keyboardController?.hide()
-                            }
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(0.8f),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ActionButtonUpload(
-                            label = "Cancel",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.secondary,
-                            onClick = { onDismiss() }
-                        )
-                        ActionButtonUpload(
-                            label = "Save",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.primary,
-                            onClick = {
-                                if (title.isNotBlank() && artist.isNotBlank()) {
-                                    val newSong = Song(title, artist, R.drawable.ic_launcher_foreground)
-                                    onAddSong(newSong)
-                                    onDismiss()
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun UploadBox(label: String, modifier: Modifier = Modifier) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .height(120.dp)
-            .width(120.dp)
-            .border(1.dp, MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(8.dp))
-            .clickable { /* TODO: buka picker */ }
-    ) {
-        Text(text = label)
-    }
-}
-
-@Composable
-fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Color, onClick: () -> Unit){
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .height(48.dp)
-            .width(150.dp)
-        ,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = color,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-    }
-}
-
 
 @Composable
 fun TabButton(text: String, isSelected: Boolean) {
