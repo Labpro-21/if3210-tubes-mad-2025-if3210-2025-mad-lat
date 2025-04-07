@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,6 +33,7 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
 @Composable
 fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
+    val context = LocalContext.current
 
     Scaffold(
         bottomBar = {
@@ -72,7 +74,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     NewSongItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong)
+                            musicViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )
@@ -95,7 +97,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     RecentlyPlayedItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong)
+                            musicViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )
@@ -116,7 +118,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
         horizontalAlignment = Alignment.Start
     ) {
         Image(
-            painter = painterResource(id = song.imageRes),
+            painter = painterResource(id = song.artworkUri.toInt()),
             contentDescription = song.title,
             modifier = Modifier
                 .size(120.dp)
@@ -147,7 +149,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(id = song.imageRes),
+            painter = painterResource(id = song.artworkUri.toInt()),
             contentDescription = song.title,
             modifier = Modifier
                 .size(50.dp)
@@ -212,21 +214,27 @@ fun BottomPlayerBar() {
     }
 }
 
-data class Song(val title: String, val artist: String, val imageRes: Int)
+data class Song(
+    val title: String,
+    val artist: String,
+    val duration: Long,
+    val uri: String,
+    val artworkUri: String
+)
 
 val newSongs = listOf(
-    Song("Starboy", "The Weeknd, Da...", R.drawable.ic_launcher_foreground),
-    Song("Here Comes T...", "The Beatles", R.drawable.ic_launcher_foreground),
-    Song("Midnight Pret...", "Tomoko Aran", R.drawable.ic_launcher_foreground),
-    Song("Violent", "Kanye", R.drawable.ic_launcher_foreground)
+    Song("Starboy", "The Weeknd, Da...", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Here Comes T...", "The Beatles", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Midnight Pret...", "Tomoko Aran", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Violent", "Kanye", 100, "", R.drawable.ic_launcher_foreground.toString())
 )
 
 val recentlyPlayed = listOf(
-    Song("Jazz is for ordinary people", "berlioz", R.drawable.ic_launcher_foreground),
-    Song("Loose", "Daniel Caesar", R.drawable.ic_launcher_foreground),
-    Song("Nights", "Frank Ocean", R.drawable.ic_launcher_foreground),
-    Song("Kiss of Life", "Sade", R.drawable.ic_launcher_foreground),
-    Song("Best Interest", "Tyler, The Creator", R.drawable.ic_launcher_foreground)
+    Song("Jazz is for ordinary people", "berlioz", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Loose", "Daniel Caesar", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Nights", "Frank Ocean", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Kiss of Life", "Sade", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Best Interest", "Tyler, The Creator", 100, "", R.drawable.ic_launcher_foreground.toString())
 )
 
 @Preview(showBackground = true)

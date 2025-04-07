@@ -4,10 +4,12 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.tubesmobile.purrytify.data.local.db.SongDao
 import com.tubesmobile.purrytify.data.local.db.entities.SongEntity
+import com.tubesmobile.purrytify.data.local.db.entities.SongUploader
+import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
 import androidx.room.Room
 import android.content.Context
 
-@Database(entities = [SongEntity::class], version = 1)
+@Database(entities = [SongEntity::class, LikedSongCrossRef::class, SongUploader::class], version = 1)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
 
@@ -20,7 +22,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "purrytify_database"
-                ).build()
+                )   .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

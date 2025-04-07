@@ -28,6 +28,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,28 +55,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import kotlinx.coroutines.launch
+import com.tubesmobile.purrytify.viewmodel.SongViewModel
+import java.io.File
 
 // SAMPLE DATA
 val songs = listOf(
-    Song("STARBOY", "The Weeknd, Daft Punk", R.drawable.ic_launcher_foreground),
-    Song("Here Comes The Sun - Remaster...", "The Beatles", R.drawable.ic_launcher_foreground),
-    Song("MIDNIGHT PRETENDERS", "Tomoko Aran", R.drawable.ic_launcher_foreground),
-    Song("VIOLENT CRIMES", "Kanye West", R.drawable.ic_launcher_foreground),
-    Song("DENIAL IS A RIVER", "Doechii", R.drawable.ic_launcher_foreground),
-    Song("Doomsday", "MF DOOM, Pebbles The Invisible Girl", R.drawable.ic_launcher_foreground)
+    Song("STARBOY", "The Weeknd, Daft Punk", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Here Comes The Sun - Remaster...", "The Beatles", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("MIDNIGHT PRETENDERS", "Tomoko Aran", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("VIOLENT CRIMES", "Kanye West", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("DENIAL IS A RIVER", "Doechii", 100, "", R.drawable.ic_launcher_foreground.toString()),
+    Song("Doomsday", "MF DOOM, Pebbles The Invisible Girl", 100, "", R.drawable.ic_launcher_foreground.toString())
 )
 
 @Composable
 fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
-    var songsList by remember { mutableStateOf(songs) }
-
+    val songViewModel: SongViewModel = viewModel()
+    val songsList by songViewModel.allSongs.collectAsState(initial = emptyList())
+    val context = LocalContext.current
 
     Scaffold(
         bottomBar = {
@@ -121,31 +127,39 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TabButton(text = "All", isSelected = true)
-                TabButton(text = "Liked", isSelected = false)
-            }
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 16.dp)
-            ) {
-                items(songsList) { song ->
-                    SongItem(
-                        song = song,
-                        onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong)
-                            navController.navigate("music/${Screen.LIBRARY.name}")
-                        })
+            if (songsList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Your library is empty. Tap + to add a song!",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
+                ) {
+                    items(songsList) { song ->
+                        SongItem(
+                            song = song,
+                            onClick = { selectedSong ->
+                                musicViewModel.playSong(selectedSong, context)
+                                navController.navigate("music/${Screen.LIBRARY.name}")
+                            }
+                        )
+                    }
                 }
             }
+
         }
         if (showPopup) {
             Box(
@@ -162,8 +176,9 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
 
             SwipeableUpload(
                 onDismiss = { showPopup = false },
-                onAddSong = { newSong ->
-                    songsList = songsList + newSong
+                onAddSong = { song, onExists ->
+                    songViewModel.checkAndInsertSong(context, song, "13522126@std.stei.itb.ac.id", onExists)
+                    showPopup = false
                 }
             )
         }
@@ -171,7 +186,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
 }
 
 @Composable
-fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
+fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Unit) -> Unit) {
 
     fun shortenFilename(name: String, maxLength: Int = 20): String {
         return if (name.length <= maxLength) name
@@ -182,7 +197,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
     val offsetY = remember { Animatable(0f) }
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
-    var duration by remember { mutableStateOf("") }
+    var duration by remember { mutableStateOf(0L) }
     var audioUri by remember { mutableStateOf<Uri?>(null) }
     var artworkUri by remember { mutableStateOf<Uri?>(null) }
     var selectedArtwork by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -191,6 +206,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
     val titleFocusRequester = remember { FocusRequester() }
     val artistFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    var showDuplicateDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -213,8 +229,8 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
             title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
             artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
 
-            val dur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-            duration = dur?.let { d -> "${d / 1000 / 60}:${(d / 1000 % 60).toString().padStart(2, '0')}" } ?: ""
+            duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?: 0L
+            var duration_formatted = duration?.let { d -> "${d / 1000 / 60}:${(d / 1000 % 60).toString().padStart(2, '0')}" } ?: ""
 
             val art = retriever.embeddedPicture
             art?.let { byteArray ->
@@ -228,6 +244,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
 
     val launcherArtwork = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
+            artworkUri = it
             val stream = context.contentResolver.openInputStream(it)
             val bitmap = BitmapFactory.decodeStream(stream)
             stream?.close()
@@ -401,16 +418,23 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
                         ActionButtonUpload("Cancel", color = MaterialTheme.colorScheme.secondary) { onDismiss() }
                         ActionButtonUpload("Save", color = MaterialTheme.colorScheme.primary) {
                             if (title.isNotBlank() && artist.isNotBlank() && audioUri != null) {
+                                val artworkSource = if (selectedArtwork != null && artworkUri == null) {
+                                    "Metadata"
+                                } else {
+                                    artworkUri?.toString()
+                                }
+
                                 val newSong = Song(
                                     title = title,
                                     artist = artist,
-                                    imageRes = R.drawable.ic_launcher_foreground, // placeholder
-//                                    uri = audioUri.toString(), // assuming you've added a uri field in your Song model
-//                                    artworkUri = artworkUri?.toString(),
-//                                    duration = duration
+                                    duration = duration,
+                                    uri = audioUri.toString(),
+                                    artworkUri = artworkSource ?: ""
                                 )
-                                onAddSong(newSong)
-                                onDismiss()
+
+                                onAddSong(newSong) {
+                                    showDuplicateDialog = true
+                                }
                             }
                         }
                     }
@@ -418,6 +442,19 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
             }
         }
     }
+    if (showDuplicateDialog) {
+        AlertDialog(
+            onDismissRequest = { showDuplicateDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showDuplicateDialog = false }) {
+                    Text("OK")
+                }
+            },
+            title = { Text("Duplicate Song") },
+            text = { Text("Song with the same title and artist has already exist") }
+        )
+    }
+
 }
 
 
@@ -488,6 +525,17 @@ fun TabButton(text: String, isSelected: Boolean) {
 
 @Composable
 fun SongItem(song: Song, onClick: (Song) -> Unit) {
+    val context = LocalContext.current
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(song.artworkUri) {
+        val file = File(song.artworkUri)
+        if (file.exists()) {
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            imageBitmap = bitmap?.asImageBitmap()
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -495,12 +543,30 @@ fun SongItem(song: Song, onClick: (Song) -> Unit) {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = painterResource(id = song.imageRes),
-            contentDescription = song.title,
-            modifier = Modifier
-                .size(56.dp)
-        )
+        when {
+            imageBitmap != null -> {
+                Image(
+                    bitmap = imageBitmap!!,
+                    contentDescription = song.title,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+            song.artworkUri.isEmpty() -> {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = song.title,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+            else -> {
+                val resId = song.artworkUri.toIntOrNull() ?: R.drawable.ic_launcher_foreground
+                Image(
+                    painter = painterResource(id = resId),
+                    contentDescription = song.title,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -521,6 +587,7 @@ fun SongItem(song: Song, onClick: (Song) -> Unit) {
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable

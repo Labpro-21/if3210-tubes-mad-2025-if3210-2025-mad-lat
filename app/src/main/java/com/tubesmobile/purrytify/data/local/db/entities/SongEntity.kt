@@ -7,7 +7,7 @@ data class SongEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val artist: String,
-    val artworkPath: String,
-    val filePath: String,
+    val artworkUri: String?,
+    val uri: String,
     val duration: Long
 )
