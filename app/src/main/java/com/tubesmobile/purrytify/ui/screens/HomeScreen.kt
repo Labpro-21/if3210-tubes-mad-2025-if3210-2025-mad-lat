@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,6 +33,7 @@ import com.tubesmobile.purrytify.viewmodel.MusicViewModel
 @Composable
 fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
+    val context = LocalContext.current
 
     Scaffold(
         bottomBar = {
@@ -73,7 +75,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     NewSongItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong)
+                            musicViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )
@@ -96,7 +98,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     RecentlyPlayedItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong)
+                            musicViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )

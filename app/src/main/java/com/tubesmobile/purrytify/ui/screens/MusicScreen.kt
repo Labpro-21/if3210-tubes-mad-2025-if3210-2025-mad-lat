@@ -1,5 +1,8 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,13 +23,19 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -120,22 +129,56 @@ fun MusicScreen(
 
             Spacer(modifier = Modifier.height(64.dp))
 
-            // Album artwork
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f), // Square aspect ratio
+                    .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter =
+                val context = LocalContext.current
+                val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
+                val imageBitmap = imageBitmapState.value
 
-                        painterResource(id = R.drawable.starboy) // Placeholder
-                    ,
-                    contentDescription = "Album Art",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                LaunchedEffect(song?.artworkUri) {
+                    imageBitmapState.value = null
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        if (song?.artworkUri == "Metadata") {
+                            retriever.setDataSource(context, Uri.parse(song.uri))
+                            val art = retriever.embeddedPicture
+                            if (art != null) {
+                                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                                imageBitmapState.value = bitmap.asImageBitmap()
+                            }
+                        } else if (!song?.artworkUri.isNullOrEmpty()) {
+                            val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                            if (fileBitmap != null) {
+                                imageBitmapState.value = fileBitmap.asImageBitmap()
+                            }
+                        }
+                    } catch (_: Exception) {
+                        imageBitmapState.value = null
+                    } finally {
+                        retriever.release()
+                    }
+                }
+
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap!!,
+                        contentDescription = "Album Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.starboy), // fallback
+                        contentDescription = "Album Art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
             }
 
             // Song title and artist
@@ -262,8 +305,9 @@ fun MusicScreen(
 fun MusicScreenPreview() {
     val dummyNavController = rememberNavController()
     val previewViewModel: MusicViewModel = viewModel()
+    val context = LocalContext.current
 
-     previewViewModel.playSong(Song("Preview Song", "Preview Artist", 300, "",  R.drawable.ic_launcher_foreground.toString()))
+     previewViewModel.playSong(Song("Preview Song", "Preview Artist", 300, "",  R.drawable.ic_launcher_foreground.toString()), context)
 
     MusicScreen(
         navController = dummyNavController,

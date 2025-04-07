@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SongDao {
 
+    @Query("SELECT EXISTS(SELECT 1 FROM songs AS s JOIN song_uploader AS su WHERE s.title = :title AND s.artist = :artist AND su.uploaderEmail = :userEmail AND s.id = su.songId)")
+    suspend fun isSongExistsForUser(title: String, artist: String, userEmail: String): Boolean
+
     @Query("SELECT EXISTS(SELECT 1 FROM songs WHERE title = :title AND artist = :artist)")
     suspend fun isSongExists(title: String, artist: String): Boolean
 
@@ -16,7 +19,7 @@ interface SongDao {
     suspend fun registerUserToSong(uploader: String, songId: Int)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSong(song: SongEntity)
+    suspend fun insertSong(song: SongEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun likeSong(crossRef: LikedSongCrossRef)
@@ -45,4 +48,7 @@ interface SongDao {
         )
     """)
     suspend fun isSongLiked(userEmail: String, songId: Int): Boolean
+
+    @Query("SELECT id FROM songs WHERE title = :title AND artist = :artist")
+    suspend fun getSongId(title: String, artist: String): Int
 }

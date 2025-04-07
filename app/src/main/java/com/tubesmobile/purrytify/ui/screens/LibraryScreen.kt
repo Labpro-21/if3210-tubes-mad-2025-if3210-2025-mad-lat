@@ -62,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.tubesmobile.purrytify.viewmodel.MusicViewModel
 import com.tubesmobile.purrytify.viewmodel.SongViewModel
+import java.io.File
 
 // SAMPLE DATA
 val songs = listOf(
@@ -79,7 +80,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
     var showPopup by remember { mutableStateOf(false) }
     val songViewModel: SongViewModel = viewModel()
     val songsList by songViewModel.allSongs.collectAsState(initial = emptyList())
-
+    val context = LocalContext.current
 
     Scaffold(
         bottomBar = {
@@ -152,7 +153,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                         SongItem(
                             song = song,
                             onClick = { selectedSong ->
-                                musicViewModel.playSong(selectedSong)
+                                musicViewModel.playSong(selectedSong, context)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
@@ -176,8 +177,9 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
 
             SwipeableUpload(
                 onDismiss = { showPopup = false },
-                onAddSong = { newSong ->
-                    songViewModel.insertSong(newSong)
+                onAddSong = { song, onExists ->
+                    songViewModel.checkAndInsertSong(context, song, "13522126@std.stei.itb.ac.id", onExists)
+                    showPopup = false
                 }
             )
         }
@@ -185,7 +187,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
 }
 
 @Composable
-fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
+fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Unit) -> Unit) {
 
     fun shortenFilename(name: String, maxLength: Int = 20): String {
         return if (name.length <= maxLength) name
@@ -205,6 +207,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
     val titleFocusRequester = remember { FocusRequester() }
     val artistFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    var showDuplicateDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -429,8 +432,10 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
                                     uri = audioUri.toString(),
                                     artworkUri = artworkSource ?: ""
                                 )
-                                onAddSong(newSong)
-                                onDismiss()
+
+                                onAddSong(newSong) {
+                                    showDuplicateDialog = true
+                                }
                             }
                         }
                     }
@@ -438,6 +443,19 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song) -> Unit) {
             }
         }
     }
+    if (showDuplicateDialog) {
+        AlertDialog(
+            onDismissRequest = { showDuplicateDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showDuplicateDialog = false }) {
+                    Text("OK")
+                }
+            },
+            title = { Text("Duplicate Song") },
+            text = { Text("Song with the same title and artist has already exist") }
+        )
+    }
+
 }
 
 
@@ -512,20 +530,10 @@ fun SongItem(song: Song, onClick: (Song) -> Unit) {
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(song.artworkUri) {
-        if (song.artworkUri == "Metadata") {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(context, Uri.parse(song.uri))
-                val art = retriever.embeddedPicture
-                if (art != null) {
-                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                    imageBitmap = bitmap.asImageBitmap()
-                }
-            } catch (_: Exception) {
-                imageBitmap = null
-            } finally {
-                retriever.release()
-            }
+        val file = File(song.artworkUri)
+        if (file.exists()) {
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            imageBitmap = bitmap?.asImageBitmap()
         }
     }
 
@@ -552,7 +560,6 @@ fun SongItem(song: Song, onClick: (Song) -> Unit) {
                 )
             }
             else -> {
-                // Assume it's a drawable resource ID stored as string
                 val resId = song.artworkUri.toIntOrNull() ?: R.drawable.ic_launcher_foreground
                 Image(
                     painter = painterResource(id = resId),
