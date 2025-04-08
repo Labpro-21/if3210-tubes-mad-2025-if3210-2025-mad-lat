@@ -82,6 +82,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
     val songViewModel: SongViewModel = viewModel()
     val songsList by songViewModel.allSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
+    val currentSong by musicViewModel.currentSong.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -152,8 +153,11 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                     items(songsList) { song ->
                         SongItem(
                             song = song,
+                            isPlaying = song.uri == currentSong?.uri,
                             onClick = { selectedSong ->
-                                musicViewModel.playSong(selectedSong, context)
+                                if (selectedSong.uri != currentSong?.uri) {
+                                    musicViewModel.playSong(selectedSong, context)
+                                }
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
@@ -533,7 +537,7 @@ fun TabButton(text: String, isSelected: Boolean) {
 }
 
 @Composable
-fun SongItem(song: Song, onClick: (Song) -> Unit) {
+fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
     val context = LocalContext.current
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -584,9 +588,11 @@ fun SongItem(song: Song, onClick: (Song) -> Unit) {
         ) {
             Text(
                 text = song.title,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = song.artist,

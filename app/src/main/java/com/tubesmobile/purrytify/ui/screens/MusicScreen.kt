@@ -57,6 +57,10 @@ fun MusicScreen(
 ) {
     // Collect the current song from the ViewModel
     val currentSong by musicViewModel.currentSong.collectAsState()
+    val isPlaying by musicViewModel.isPlaying.collectAsState()
+
+    val position by musicViewModel.currentPosition.collectAsState()
+    val duration by musicViewModel.duration.collectAsState()
 
     val song = currentSong
 
@@ -223,8 +227,11 @@ fun MusicScreen(
                     .padding(top = 24.dp)
             ) {
                 Slider(
-                    value = 0.4f, // Current progress
-                    onValueChange = { /* Update progress */ },
+                    value = if (duration > 0) position.toFloat() / duration else 0f, // Current progress
+                    onValueChange = { newValue ->
+                        val newPosition = (newValue * duration).toInt()
+                        musicViewModel.seekTo(newPosition)
+                    },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
                         activeTrackColor = Color.White,
@@ -238,12 +245,12 @@ fun MusicScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "1:44",
+                        text = formatMillis(position),
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
                     Text(
-                        text = "3:50",
+                        text = formatMillis(duration),
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
@@ -271,13 +278,13 @@ fun MusicScreen(
                 Box(
                     modifier = Modifier
                         .size(84.dp)
-                        .clickable { /* Play/Pause */ },
+                        .clickable { musicViewModel.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         // Play icon
-                        painter = painterResource(id = R.drawable.play),
-                        contentDescription = "Play",
+                        painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
+                        contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = Color.White,
                         modifier = Modifier.size(84.dp)
                     )
@@ -297,6 +304,12 @@ fun MusicScreen(
             Spacer(modifier = Modifier.weight(1f))
         }
     }
+}
+
+fun formatMillis(millis: Int): String {
+    val minutes = millis / 1000 / 60
+    val seconds = (millis / 1000) % 60
+    return "%d:%02d".format(minutes, seconds)
 }
 
 @Preview(showBackground = true)
