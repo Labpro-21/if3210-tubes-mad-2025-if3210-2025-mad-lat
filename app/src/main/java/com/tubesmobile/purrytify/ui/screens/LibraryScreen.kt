@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -212,9 +213,17 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Uni
 
     var pickedFileName by remember { mutableStateOf<String?>(null) }
 
-    val launcherAudio = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val launcherAudio = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
         uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+
             audioUri = it
+
             val cursor = context.contentResolver.query(it, null, null, null, null)
             cursor?.use { c ->
                 val nameIndex = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -223,14 +232,13 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Uni
                     pickedFileName = shortenFilename(fileName)
                 }
             }
+
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(context, it)
 
             title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
             artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
-
-            duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?: 0L
-            var duration_formatted = duration?.let { d -> "${d / 1000 / 60}:${(d / 1000 % 60).toString().padStart(2, '0')}" } ?: ""
+            duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
 
             val art = retriever.embeddedPicture
             art?.let { byteArray ->
@@ -241,6 +249,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Uni
             retriever.release()
         }
     }
+
 
     val launcherArtwork = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
@@ -364,7 +373,7 @@ fun SwipeableUpload(onDismiss: () -> Unit, onAddSong: (Song, onExists: () -> Uni
                             image = null,
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                launcherAudio.launch("audio/*")
+                                launcherAudio.launch(arrayOf("audio/*"))
                             }
                         )
                     }

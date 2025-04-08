@@ -10,6 +10,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.tubesmobile.purrytify.service.PermissionManager
 import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.HomeScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
@@ -27,6 +28,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!PermissionManager.hasAudioPermission(this)) {
+            PermissionManager.requestAudioPermission(this)
+        }
         enableEdgeToEdge()
         setContent {
             PurrytifyTheme {
