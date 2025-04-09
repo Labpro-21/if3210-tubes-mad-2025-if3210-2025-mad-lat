@@ -27,12 +27,23 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun loadProfile() {
         _profile.value = ProfileState.Loading
 
+        android.util.Log.d("ProfileViewModel", "Loading profile...")
+
         viewModelScope.launch {
             val result = repository.getProfile()
-            _profile.value = if (result.isSuccess) {
-                ProfileState.Success(result.getOrNull()!!)
+            if (result.isSuccess) {
+                android.util.Log.d("ProfileViewModel", "Profile loaded successfully")
+                _profile.value = ProfileState.Success(result.getOrNull()!!)
             } else {
-                ProfileState.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                android.util.Log.e("ProfileViewModel", "Error loading profile: $error")
+
+                // Check if this is a token expiration that requires re-login
+                if (error.contains("please login again")) {
+                    _profile.value = ProfileState.SessionExpired
+                } else {
+                    _profile.value = ProfileState.Error(error)
+                }
             }
         }
     }
@@ -49,5 +60,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         object Loading : ProfileState()
         data class Success(val profile: ProfileResponse) : ProfileState()
         data class Error(val message: String) : ProfileState()
+        object SessionExpired : ProfileState() // New state for expired session
     }
 }

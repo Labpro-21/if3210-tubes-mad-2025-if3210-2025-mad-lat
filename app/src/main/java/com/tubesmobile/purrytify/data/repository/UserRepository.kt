@@ -35,19 +35,23 @@ class UserRepository(
                     return Result.success(it)
                 }
                 return Result.failure(Exception("Empty response"))
-            } else if (response.code() == 403) {
+            } else if (response.code() == 403 || response.code() == 401) {
                 // Token expired, try to refresh
                 val refreshResult = refreshToken()
                 if (refreshResult.isSuccess) {
                     // Retry with new token
                     return getProfile()
+                } else {
+                    // Force logout
+                    tokenManager.clearTokens()
+                    return Result.failure(Exception("Token expired and refresh failed - please login again"))
                 }
-                Result.failure(Exception("Token expired and refresh failed"))
             } else {
-                Result.failure(Exception("Failed to get profile: ${response.code()}"))
+                return Result.failure(Exception("Failed to get profile: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("UserRepository", "Error fetching profile", e)
+            return Result.failure(e)
         }
     }
 
@@ -55,20 +59,26 @@ class UserRepository(
         val refreshToken = tokenManager.getRefreshToken()
             ?: return Result.failure(Exception("No refresh token available"))
 
+        android.util.Log.d("UserRepository", "Attempting to refresh token")
+
         // Get new refresh token from server
         return try {
             val response = apiService.refreshToken(RefreshTokenRequest(refreshToken))
             if (response.isSuccessful) {
                 response.body()?.let {
                     tokenManager.saveToken(it.token, refreshToken)
+                    android.util.Log.d("UserRepository", "Token refreshed successfully")
                     return Result.success(true)
                 }
+                android.util.Log.e("UserRepository", "Empty response while refreshing token")
                 return Result.failure(Exception("Empty response"))
             } else {
-                Result.failure(Exception("Failed to refresh token: ${response.code()}"))
+                android.util.Log.e("UserRepository", "Failed to refresh token: ${response.code()}")
+                return Result.failure(Exception("Failed to refresh token: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("UserRepository", "Error refreshing token", e)
+            return Result.failure(e)
         }
     }
 

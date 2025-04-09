@@ -114,6 +114,18 @@ fun ProfileScreen(navController: NavHostController) {
                         }
                     )
                 }
+                is ProfileViewModel.ProfileState.SessionExpired -> {
+                    LaunchedEffect(Unit) {
+                        // Navigate to login screen
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                    // Show loading or some message while redirecting
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
         }
     }
