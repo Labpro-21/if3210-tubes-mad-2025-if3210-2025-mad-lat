@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import kotlinx.coroutines.launch
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
@@ -107,6 +108,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
                 .padding(top = 16.dp)
+                .padding(bottom = 56.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -167,6 +169,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
             }
 
         }
+
         if (showPopup) {
             Box(
                 modifier = Modifier
