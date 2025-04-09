@@ -100,6 +100,14 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-
-
+//    fun updateSong(song: Song) { // Ubah dari Song ke SongEntity
+//        viewModelScope.launch {
+//            songDao.update(song)
+//        }
+//    }
+    fun updateSongTimestamp(song: Song) {
+            viewModelScope.launch {
+                songDao.updateCaller(song)
+            }
+        }
 }

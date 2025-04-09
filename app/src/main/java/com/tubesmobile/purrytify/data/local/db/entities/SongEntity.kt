@@ -9,5 +9,6 @@ data class SongEntity(
     val artist: String,
     val artworkUri: String?,
     val uri: String,
-    val duration: Long
+    val duration: Long,
+    val lastPlayedTimestamp: Long? = 69
 )
