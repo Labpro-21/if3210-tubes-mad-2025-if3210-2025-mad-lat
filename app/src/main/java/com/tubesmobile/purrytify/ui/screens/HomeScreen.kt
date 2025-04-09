@@ -56,7 +56,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                             Screen.HOME -> {}
                             Screen.LIBRARY -> navController.navigate("library")
                             Screen.PROFILE -> navController.navigate("profile")
-                            Screen.MUSIC -> navController.navigate("music/${Screen.HOME.name}")
+                            Screen.MUSIC -> {}
                         }
                     }
                 )
@@ -102,7 +102,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                             song = song,
                             onClick = { selectedSong ->
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}")
+                                navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
                     }
@@ -141,7 +141,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                             song = song,
                             onClick = { selectedSong ->
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}")
+                                navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
                     }
@@ -202,7 +202,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
         horizontalAlignment = Alignment.Start
     ) {
         Image(
-            painter = painterResource(id = song.artworkUri.toInt()),
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
             contentDescription = song.title,
             modifier = Modifier
                 .size(120.dp)
@@ -233,7 +233,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(id = song.artworkUri.toInt()),
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
             contentDescription = song.title,
             modifier = Modifier
                 .size(50.dp)
