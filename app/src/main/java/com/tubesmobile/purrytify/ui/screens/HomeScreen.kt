@@ -28,10 +28,10 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
+fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
 
@@ -74,7 +74,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     NewSongItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong, context)
+                            musicBehaviorViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )
@@ -97,7 +97,7 @@ fun HomeScreen(navController: NavHostController, musicViewModel: MusicViewModel)
                     RecentlyPlayedItem(
                         song = song,
                         onClick = { selectedSong ->
-                            musicViewModel.playSong(selectedSong, context)
+                            musicBehaviorViewModel.playSong(selectedSong, context)
                             navController.navigate("music/${Screen.HOME.name}")
                         }
                     )
@@ -241,7 +241,7 @@ val recentlyPlayed = listOf(
 @Composable
 fun HomeScreenPreview() {
     val navController = rememberNavController()
-    val previewViewModel: MusicViewModel = viewModel()
+    val previewViewModel: MusicBehaviorViewModel = viewModel()
 
     PurrytifyTheme {
         HomeScreen(navController, previewViewModel)

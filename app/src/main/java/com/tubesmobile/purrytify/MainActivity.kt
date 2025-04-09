@@ -22,11 +22,11 @@ import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
-import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 
 class MainActivity : ComponentActivity() {
-    private val musicViewModel by viewModels<MusicViewModel>()
+    private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
     private lateinit var tokenManager: TokenManager
 
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                     LocalNetworkStatus provides networkViewModel.isConnected
                 ) {
                     PurrytifyNavHost(
-                        musicViewModel,
+                        musicBehaviorViewModel,
                         isLoggedIn = tokenManager.getToken() != null)
                 }
             }
@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PurrytifyNavHost(musicViewModel: MusicViewModel, isLoggedIn: Boolean) {
+fun PurrytifyNavHost(musicBehaviorViewModel: MusicBehaviorViewModel, isLoggedIn: Boolean) {
     val navController = rememberNavController()
 
     NavHost(
@@ -67,10 +67,10 @@ fun PurrytifyNavHost(musicViewModel: MusicViewModel, isLoggedIn: Boolean) {
             LoginScreen(navController = navController)
         }
         composable("home") {
-            HomeScreen(navController = navController, musicViewModel = musicViewModel)
+            HomeScreen(navController = navController, musicBehaviorViewModel = musicBehaviorViewModel)
         }
         composable("library") {
-            MusicLibraryScreen(navController = navController, musicViewModel = musicViewModel)
+            MusicLibraryScreen(navController = navController, musicBehaviorViewModel = musicBehaviorViewModel)
         }
         composable("profile") {
             ProfileScreen(navController = navController)
@@ -83,7 +83,7 @@ fun PurrytifyNavHost(musicViewModel: MusicViewModel, isLoggedIn: Boolean) {
             MusicScreen(
                 navController = navController,
                 sourceScreen = sourceScreen,
-                musicViewModel = musicViewModel
+                musicBehaviorViewModel = musicBehaviorViewModel
             )
         }
     }

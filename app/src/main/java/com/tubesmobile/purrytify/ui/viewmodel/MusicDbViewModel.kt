@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 
-class SongViewModel(application: Application) : AndroidViewModel(application) {
+class MusicDbViewModel(application: Application) : AndroidViewModel(application) {
     private val songDao = AppDatabase.Companion.getDatabase(application).songDao()
 
     val allSongs: Flow<List<Song>> =

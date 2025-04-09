@@ -61,9 +61,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import kotlinx.coroutines.launch
-import com.tubesmobile.purrytify.viewmodel.SongViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
 
 // SAMPLE DATA
@@ -77,13 +77,13 @@ val songs = listOf(
 )
 
 @Composable
-fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicViewModel) {
+fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
-    val songViewModel: SongViewModel = viewModel()
-    val songsList by songViewModel.allSongs.collectAsState(initial = emptyList())
+    val musicDbViewModel: MusicDbViewModel = viewModel()
+    val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
-    val currentSong by musicViewModel.currentSong.collectAsState()
+    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -157,7 +157,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
                             isPlaying = song.uri == currentSong?.uri,
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
-                                    musicViewModel.playSong(selectedSong, context)
+                                    musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
@@ -183,7 +183,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicViewModel: MusicVi
             SwipeableUpload(
                 onDismiss = { showPopup = false },
                 onAddSong = { song, onExists ->
-                    songViewModel.checkAndInsertSong(context, song, "13522126@std.stei.itb.ac.id", onExists)
+                    musicDbViewModel.checkAndInsertSong(context, song, "13522126@std.stei.itb.ac.id", onExists)
                     showPopup = false
                 }
             )
@@ -609,7 +609,7 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
 @Composable
 fun MusicLibraryScreenPreview() {
     val navController = rememberNavController()
-    val previewViewModel: MusicViewModel = viewModel()
+    val previewViewModel: MusicBehaviorViewModel = viewModel()
 
     PurrytifyTheme {
         MusicLibraryScreen(navController, previewViewModel)
