@@ -47,20 +47,20 @@ import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
-import com.tubesmobile.purrytify.ui.viewmodel.MusicViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 
 @Composable
 fun MusicScreen(
     navController: NavHostController,
     sourceScreen: Screen,
-    musicViewModel: MusicViewModel
+    musicBehaviorViewModel: MusicBehaviorViewModel
 ) {
     // Collect the current song from the ViewModel
-    val currentSong by musicViewModel.currentSong.collectAsState()
-    val isPlaying by musicViewModel.isPlaying.collectAsState()
+    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
 
-    val position by musicViewModel.currentPosition.collectAsState()
-    val duration by musicViewModel.duration.collectAsState()
+    val position by musicBehaviorViewModel.currentPosition.collectAsState()
+    val duration by musicBehaviorViewModel.duration.collectAsState()
 
     val song = currentSong
 
@@ -230,7 +230,7 @@ fun MusicScreen(
                     value = if (duration > 0) position.toFloat() / duration else 0f, // Current progress
                     onValueChange = { newValue ->
                         val newPosition = (newValue * duration).toInt()
-                        musicViewModel.seekTo(newPosition)
+                        musicBehaviorViewModel.seekTo(newPosition)
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
@@ -278,7 +278,7 @@ fun MusicScreen(
                 Box(
                     modifier = Modifier
                         .size(84.dp)
-                        .clickable { musicViewModel.togglePlayPause() },
+                        .clickable { musicBehaviorViewModel.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -316,7 +316,7 @@ fun formatMillis(millis: Int): String {
 @Composable
 fun MusicScreenPreview() {
     val dummyNavController = rememberNavController()
-    val previewViewModel: MusicViewModel = viewModel()
+    val previewViewModel: MusicBehaviorViewModel = viewModel()
     val context = LocalContext.current
 
      previewViewModel.playSong(Song("Preview Song", "Preview Artist", 300, "",  R.drawable.ic_launcher_foreground.toString()), context)
@@ -324,6 +324,6 @@ fun MusicScreenPreview() {
     MusicScreen(
         navController = dummyNavController,
         sourceScreen = Screen.HOME,
-        musicViewModel = previewViewModel
+        musicBehaviorViewModel = previewViewModel
     )
 }
