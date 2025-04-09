@@ -29,26 +29,38 @@ import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
+    var showPopup by remember { mutableStateOf(false) }
+    val musicDbViewModel: MusicDbViewModel = viewModel()
+    val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
+    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
 
     Scaffold(
         bottomBar = {
-            SharedBottomNavigationBar(
-                currentScreen = currentScreen.value,
-                onNavigate = { screen ->
-                    currentScreen.value = screen
-                    when (screen) {
-                        Screen.HOME -> {} 
-                        Screen.LIBRARY -> navController.navigate("library")
-                        Screen.PROFILE -> navController.navigate("profile")
-                        Screen.MUSIC -> navController.navigate("music/${Screen.HOME.name}")
+            Column {
+                BottomPlayerBar()
+                SharedBottomNavigationBar(
+                    currentScreen = currentScreen.value,
+                    onNavigate = { screen ->
+                        currentScreen.value = screen
+                        when (screen) {
+                            Screen.HOME -> {}
+                            Screen.LIBRARY -> navController.navigate("library")
+                            Screen.PROFILE -> navController.navigate("profile")
+                            Screen.MUSIC -> navController.navigate("music/${Screen.HOME.name}")
+                        }
                     }
-                },
-            )
+                )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -66,18 +78,34 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            LazyRow(
-                modifier = Modifier.padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(newSongs) { song ->
-                    NewSongItem(
-                        song = song,
-                        onClick = { selectedSong ->
-                            musicBehaviorViewModel.playSong(selectedSong, context)
-                            navController.navigate("music/${Screen.HOME.name}")
-                        }
+            if (songsList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No new songs available",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
                     )
+                }
+            } else {
+                LazyRow(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(songsList) { song ->
+                        NewSongItem(
+                            song = song,
+                            onClick = { selectedSong ->
+                                musicBehaviorViewModel.playSong(selectedSong, context)
+                                navController.navigate("music/${Screen.HOME.name}")
+                            }
+                        )
+                    }
                 }
             }
 
@@ -89,22 +117,78 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(recentlyPlayed) { song ->
-                    RecentlyPlayedItem(
-                        song = song,
-                        onClick = { selectedSong ->
-                            musicBehaviorViewModel.playSong(selectedSong, context)
-                            navController.navigate("music/${Screen.HOME.name}")
-                        }
+            if (songsList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No recently played songs",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(songsList) { song ->
+                        RecentlyPlayedItem(
+                            song = song,
+                            onClick = { selectedSong ->
+                                musicBehaviorViewModel.playSong(selectedSong, context)
+                                navController.navigate("music/${Screen.HOME.name}")
+                            }
+                        )
+                    }
+                }
             }
+        }
+    }
+}
 
-            BottomPlayerBar()
+@Composable
+fun BottomPlayerBar() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            contentDescription = "Now Playing",
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = "Starboy",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "The Weeknd, Da...",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
+        }
+        IconButton(onClick = { /* Play/Pause action */ }) {
+            Icon(
+                painter = painterResource(id = android.R.drawable.ic_media_play),
+                contentDescription = "Play/Pause",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
@@ -167,48 +251,6 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
                 text = song.artist,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
-            )
-        }
-    }
-}
-
-@Composable
-fun BottomPlayerBar() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-            contentDescription = "Now Playing",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(4.dp))
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = "Starboy",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "The Weeknd, Da...",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-        IconButton(onClick = { /* Play/Pause action */ }) {
-            Icon(
-                painter = painterResource(id = android.R.drawable.ic_media_play),
-                contentDescription = "Play/Pause",
-                tint = MaterialTheme.colorScheme.onSurface
             )
         }
     }
