@@ -43,13 +43,17 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
+    val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
 
-    // Filter and sort songs for recently played section
-    val recentlyPlayedSongs = songsList
-        .filter { it.lastPlayedTimestamp != null } // Only songs that have been played
-        .sortedByDescending { it.lastPlayedTimestamp } // Sort by most recent first
-        .take(5) // Take only top 5
+    val recentlyPlayedSongs = remember(songsList, songsTimestamp) {
+        val timestampMap = songsTimestamp.associateBy { it.songId }
+
+        songsList
+            .filter { it.id in timestampMap }
+            .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
+            .take(5)
+    }
 
     Scaffold(
         bottomBar = {
@@ -108,13 +112,8 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                         NewSongItem(
                             song = song,
                             onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(
-                                    selectedSong.copy(lastPlayedTimestamp = System.currentTimeMillis())
-                                )
-                                Log.d("homescreen", "timestampnya ${selectedSong.lastPlayedTimestamp}")
-                                Log.d("homescreen", "timestamp song aja ${song.lastPlayedTimestamp}")
-                                Log.d("homescreen", "harusnya ${System.currentTimeMillis()}")
-                                musicBehaviorViewModel.playSong(selectedSong, context) // Konversi ke Song
+                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                                musicBehaviorViewModel.playSong(selectedSong, context)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
@@ -153,11 +152,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                         RecentlyPlayedItem(
                             song = song,
                             onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(
-                                    selectedSong.copy(lastPlayedTimestamp = System.currentTimeMillis())
-                                )
-                                Log.d("homescreen", "timestampnya ${selectedSong.lastPlayedTimestamp}")
-                                Log.d("homescreen", "harusnya ${System.currentTimeMillis()}")
+                                musicDbViewModel.updateSongTimestamp(selectedSong) // Ubah ini
                                 musicBehaviorViewModel.playSong(selectedSong, context) // Konversi ke Song
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
@@ -276,28 +271,18 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
 
 // Data class Song tetap ada karena MusicBehaviorViewModel mungkin menggunakannya
 data class Song(
+    val id: Int? = null,
     val title: String,
     val artist: String,
     val duration: Long,
     val uri: String,
     val artworkUri: String,
-    val lastPlayedTimestamp: Long? = 69
 )
 
-// Konversi newSongs dan recentlyPlayed ke SongEntity untuk preview
-val newSongs = listOf(
-    Song(title = "Starboy", artist = "The Weeknd, Da...", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Here Comes T...", artist = "The Beatles", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Midnight Pret...", artist = "Tomoko Aran", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Violent", artist = "Kanye", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString())
-)
-
-val recentlyPlayed = listOf(
-    Song(title = "Jazz is for ordinary people", artist = "berlioz", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Loose", artist = "Daniel Caesar", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Nights", artist = "Frank Ocean", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Kiss of Life", artist = "Sade", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString()),
-    Song(title = "Best Interest", artist = "Tyler, The Creator", duration = 100, uri = "", artworkUri = R.drawable.ic_launcher_foreground.toString())
+data class SongTimestamp(
+    val userEmail: String,
+    val songId: Int,
+    val lastPlayedTimestamp: Long? = null
 )
 
 @Preview(showBackground = true)

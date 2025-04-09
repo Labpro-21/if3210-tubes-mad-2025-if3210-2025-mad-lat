@@ -1,10 +1,11 @@
 package com.tubesmobile.purrytify.data.local.db
 
+import android.R
 import android.util.Log
 import androidx.room.*
 import com.tubesmobile.purrytify.data.local.db.entities.SongEntity
 import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
-import com.tubesmobile.purrytify.ui.screens.Song
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlayTimestamp
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -56,29 +57,15 @@ interface SongDao {
     @Query("SELECT songs.* FROM songs WHERE id = :id")
     suspend fun getSongById(id: Int): SongEntity
 
+    @Query("SELECT songs_timestamp.* FROM songs_timestamp WHERE userEmail = :userEmail")
+    fun getSongsTimestampByEmail(userEmail: String): Flow<List<SongPlayTimestamp>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM songs_timestamp WHERE userEmail = :userEmail AND songId = :id)")
+    suspend fun isTimestampExistsForEmail(userEmail: String, id: Int): Boolean
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTimestamp(timestamp: SongPlayTimestamp)
+
     @Update
-    suspend fun update(song: SongEntity)
-
-    @Query("UPDATE songs SET lastPlayedTimestamp = :timestamp WHERE id = :songId")
-    suspend fun updateLastPlayedTimestamp(songId: Int, timestamp: Long?)
-
-    suspend fun updateCaller(song: Song) {
-        this.updateLastPlayedTimestamp(this.getSongId(song.title, song.artist), song.lastPlayedTimestamp)
-        Log.d("homescreen", "id nya ${this.getSongId(song.title, song.artist)}")
-        Log.d("homescreen", "timestamp nya di fungsi caller ${song.lastPlayedTimestamp}")
-        Log.d("homescreen", "ini song yg udah diambil dari database ${this.getSongById(this.getSongId(song.title, song.artist)).lastPlayedTimestamp}")
-//        Log.d("homescreen", "udah masuk kesini")
-//        val helper = SongEntity(
-//            id = this.getSongId(song.title, song.artist),
-//            title = song.title,
-//            artist = song.artist,
-//            artworkUri = song.artworkUri,
-//            uri = song.uri,
-//            duration = song.duration,
-//            lastPlayedTimestamp = song.lastPlayedTimestamp
-//        )
-//        Log.d("homescreen", "kebawah sini juga udah")
-//        Log.d("homescreen", "helpernya ${helper.lastPlayedTimestamp}")
-//        this.update(helper)
-    }
+    suspend fun updateTimestamp(timestamp: SongPlayTimestamp)
 }

@@ -67,14 +67,14 @@ import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
 
 // SAMPLE DATA
-val songs = listOf(
-    Song("STARBOY", "The Weeknd, Daft Punk", 100, "", R.drawable.ic_launcher_foreground.toString()),
-    Song("Here Comes The Sun - Remaster...", "The Beatles", 100, "", R.drawable.ic_launcher_foreground.toString()),
-    Song("MIDNIGHT PRETENDERS", "Tomoko Aran", 100, "", R.drawable.ic_launcher_foreground.toString()),
-    Song("VIOLENT CRIMES", "Kanye West", 100, "", R.drawable.ic_launcher_foreground.toString()),
-    Song("DENIAL IS A RIVER", "Doechii", 100, "", R.drawable.ic_launcher_foreground.toString()),
-    Song("Doomsday", "MF DOOM, Pebbles The Invisible Girl", 100, "", R.drawable.ic_launcher_foreground.toString())
-)
+//val songs = listOf(
+//    Song("STARBOY", "The Weeknd, Daft Punk", 100, "", R.drawable.ic_launcher_foreground.toString()),
+//    Song("Here Comes The Sun - Remaster...", "The Beatles", 100, "", R.drawable.ic_launcher_foreground.toString()),
+//    Song("MIDNIGHT PRETENDERS", "Tomoko Aran", 100, "", R.drawable.ic_launcher_foreground.toString()),
+//    Song("VIOLENT CRIMES", "Kanye West", 100, "", R.drawable.ic_launcher_foreground.toString()),
+//    Song("DENIAL IS A RIVER", "Doechii", 100, "", R.drawable.ic_launcher_foreground.toString()),
+//    Song("Doomsday", "MF DOOM, Pebbles The Invisible Girl", 100, "", R.drawable.ic_launcher_foreground.toString())
+//)
 
 @Composable
 fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
@@ -159,6 +159,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
                                 if (selectedSong.uri != currentSong?.uri) {
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
+                                musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             }
                         )
