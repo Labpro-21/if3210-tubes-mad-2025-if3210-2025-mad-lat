@@ -1,6 +1,9 @@
 package com.tubesmobile.purrytify
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +11,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleOwner
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -30,6 +39,20 @@ class MainActivity : ComponentActivity() {
     private val networkViewModel by viewModels<NetworkViewModel>()
     private lateinit var tokenManager: TokenManager
 
+    // Token expiration receiver
+    private val tokenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == TokenVerificationService.ACTION_LOGOUT) {
+                // Force logout and restart app to login screen
+                tokenManager.clearTokens()
+                val intent = Intent(this@MainActivity, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         tokenManager = TokenManager(applicationContext)
@@ -37,6 +60,12 @@ class MainActivity : ComponentActivity() {
         if (!PermissionManager.hasAudioPermission(this)) {
             PermissionManager.requestAudioPermission(this)
         }
+
+        // Register for token expiration broadcasts
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            tokenReceiver,
+            IntentFilter(TokenVerificationService.ACTION_LOGOUT)
+        )
 
         startService(Intent(this, TokenVerificationService::class.java))
 
@@ -53,11 +82,47 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        // Unregister receiver when activity is destroyed
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(tokenReceiver)
+        super.onDestroy()
+    }
+}
+
+@Composable
+fun TokenExpirationHandler(navController: NavHostController) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == TokenVerificationService.ACTION_LOGOUT) {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            }
+        }
+
+        LocalBroadcastManager.getInstance(context).registerReceiver(
+            receiver,
+            IntentFilter(TokenVerificationService.ACTION_LOGOUT)
+        )
+
+        onDispose {
+            LocalBroadcastManager.getInstance(context).unregisterReceiver(receiver)
+        }
+    }
 }
 
 @Composable
 fun PurrytifyNavHost(musicBehaviorViewModel: MusicBehaviorViewModel, isLoggedIn: Boolean) {
     val navController = rememberNavController()
+
+    // Add this line to handle token expiration within the composable hierarchy
+    TokenExpirationHandler(navController)
 
     NavHost(
         navController = navController,

@@ -18,8 +18,8 @@ class TokenVerificationService : Service() {
     private lateinit var userRepository: UserRepository
     private lateinit var tokenManager: TokenManager
 
-    // Fixed refresh interval - 4 minutes and 15 seconds
-    private val REFRESH_INTERVAL_MS = 255 * 1000L
+    // Check interval - 30 seconds
+    private val CHECK_INTERVAL_MS = 30000 * 1000L
 
     override fun onCreate() {
         super.onCreate()
@@ -31,52 +31,44 @@ class TokenVerificationService : Service() {
         if (!isRunning) {
             isRunning = true
             scope.launch {
-                scheduleTokenRefresh()
+                startTokenVerification()
             }
         }
         return START_STICKY
     }
 
-    private suspend fun scheduleTokenRefresh() {
+    private suspend fun startTokenVerification() {
         while (isRunning) {
-            tokenManager.getToken()?.let {
-                val currentTime = System.currentTimeMillis()
-                val tokenTime = tokenManager.getTokenTimestamp()
-                val elapsed = currentTime - tokenTime
-
-                if (elapsed >= REFRESH_INTERVAL_MS) {
-                    Log.d("TokenService", "Token is ${elapsed/1000}s old, refreshing now")
-                    refreshToken()
-                } else {
-                    val waitTime = REFRESH_INTERVAL_MS - elapsed
-                    Log.d("TokenService", "Token obtained ${elapsed/1000}s ago. Waiting ${waitTime/1000}s before refresh")
-                    delay(waitTime)
-                }
+            if (tokenManager.getToken() != null) {
+                verifyAndRefreshToken()
             }
+            delay(CHECK_INTERVAL_MS)
         }
     }
 
-    private suspend fun refreshToken() {
+    private suspend fun verifyAndRefreshToken() {
         try {
-            Log.d("TokenService", "Attempting to refresh token")
-            val refreshResult = userRepository.refreshToken()
+            Log.d("TokenService", "Verifying token with server...")
+            val verifyResult = userRepository.verifyToken()
 
-            if (!refreshResult.isSuccess) {
-                val error = refreshResult.exceptionOrNull()?.message ?: "Unknown error"
-                Log.e("TokenService", "Failed to refresh token: $error")
+            if (!verifyResult.isSuccess) {
+                Log.d("TokenService", "Token verification failed, attempting refresh")
+                val refreshResult = userRepository.refreshToken()
 
-                if (error.contains("403")) {
-                    // Force logout on 403 Forbidden (expired refresh token)
-                    Log.e("TokenService", "Refresh token expired, logging out")
+                if (!refreshResult.isSuccess) {
+                    Log.e("TokenService", "Token refresh failed")
+                    // Force logout on token refresh failure
                     tokenManager.clearTokens()
                     val intent = Intent(ACTION_LOGOUT)
                     LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+                } else {
+                    Log.d("TokenService", "Token refreshed successfully")
                 }
             } else {
-                Log.d("TokenService", "Token refreshed successfully")
+                Log.d("TokenService", "Token is valid")
             }
         } catch (e: Exception) {
-            Log.e("TokenService", "Error refreshing token", e)
+            Log.e("TokenService", "Error during token verification", e)
         }
     }
 

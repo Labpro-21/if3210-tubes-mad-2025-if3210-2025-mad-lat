@@ -26,7 +26,7 @@ class UserRepository(
     }
 
     suspend fun getProfile(): Result<ProfileResponse> {
-        val token = tokenManager.getToken() ?: return Result.failure(Exception("No token available"))
+        val token = tokenManager.getToken() ?: return Result.failure(Exception("Token expired"))
 
         return try {
             val response = apiService.getProfile("Bearer $token")
@@ -44,7 +44,7 @@ class UserRepository(
                 } else {
                     // Force logout
                     tokenManager.clearTokens()
-                    return Result.failure(Exception("Token expired and refresh failed - please login again"))
+                    return Result.failure(Exception("Token expired"))
                 }
             } else {
                 return Result.failure(Exception("Failed to get profile: ${response.code()}"))
