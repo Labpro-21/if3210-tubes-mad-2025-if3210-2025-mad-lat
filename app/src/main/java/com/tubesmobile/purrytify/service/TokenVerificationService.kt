@@ -3,6 +3,7 @@ package com.tubesmobile.purrytify.service
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.tubesmobile.purrytify.data.api.RetrofitClient
 import com.tubesmobile.purrytify.data.local.TokenManager
@@ -33,18 +34,22 @@ class TokenVerificationService : Service() {
     }
 
     private suspend fun checkToken() {
-        val result = userRepository.verifyToken()
-        if (result.isFailure) {
-            // Token might be expired, try to refresh
-            val refreshResult = userRepository.refreshToken()
-            if (refreshResult.isFailure) {
-                // Refresh failed, logout user
-                tokenManager.clearTokens()
+        try {
+            val result = userRepository.verifyToken()
+            if (result.isFailure) {
+                // Token might be expired, try to refresh
+                val refreshResult = userRepository.refreshToken()
+                if (refreshResult.isFailure) {
+                    // Refresh failed, logout user
+                    tokenManager.clearTokens()
 
-                // Send broadcast to notify activities
-                val intent = Intent(ACTION_LOGOUT)
-                LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+                    // Send broadcast to notify activities
+                    val intent = Intent(ACTION_LOGOUT)
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("TokenService", "Error checking token", e)
         }
     }
 
