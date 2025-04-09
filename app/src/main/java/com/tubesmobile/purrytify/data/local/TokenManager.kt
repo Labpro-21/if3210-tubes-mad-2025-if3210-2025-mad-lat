@@ -20,18 +20,22 @@ class TokenManager(context: Context) {
     companion object {
         private const val KEY_TOKEN = "jwt_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_TOKEN_TIMESTAMP = "token_timestamp"
     }
 
     fun saveToken(token: String, refreshToken: String) {
         sharedPreferences.edit {
             putString(KEY_TOKEN, token)
-                .putString(KEY_REFRESH_TOKEN, refreshToken)
+            putString(KEY_REFRESH_TOKEN, refreshToken)
+            putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis())
         }
     }
 
     fun getToken(): String? = sharedPreferences.getString(KEY_TOKEN, null)
 
     fun getRefreshToken(): String? = sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
+
+    fun getTokenTimestamp(): Long = sharedPreferences.getLong(KEY_TOKEN_TIMESTAMP, 0)
 
     fun clearTokens() {
         sharedPreferences.edit { clear() }

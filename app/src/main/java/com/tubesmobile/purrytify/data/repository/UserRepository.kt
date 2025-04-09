@@ -59,15 +59,11 @@ class UserRepository(
         val refreshToken = tokenManager.getRefreshToken()
             ?: return Result.failure(Exception("No refresh token available"))
 
-        android.util.Log.d("UserRepository", "Attempting to refresh token")
-
-        // Get new refresh token from server
         return try {
             val response = apiService.refreshToken(RefreshTokenRequest(refreshToken))
             if (response.isSuccessful) {
                 response.body()?.let {
-                    tokenManager.saveToken(it.token, refreshToken)
-                    android.util.Log.d("UserRepository", "Token refreshed successfully")
+                    tokenManager.saveToken(it.accessToken, it.refreshToken)
                     return Result.success(true)
                 }
                 android.util.Log.e("UserRepository", "Empty response while refreshing token")
@@ -87,7 +83,12 @@ class UserRepository(
 
         return try {
             val response = apiService.verifyToken("Bearer $token")
-            Result.success(response.isSuccessful)
+            if (response.isSuccessful) {
+                Result.success(response.isSuccessful)
+            }
+            else {
+                Result.failure(Exception("Token verification failed with code: ${response.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
