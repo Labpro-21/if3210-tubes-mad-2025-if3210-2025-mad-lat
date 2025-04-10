@@ -29,6 +29,7 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import androidx.compose.runtime.collectAsState
@@ -58,7 +59,6 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     Scaffold(
         bottomBar = {
             Column {
-                BottomPlayerBar()
                 SharedBottomNavigationBar(
                     currentScreen = currentScreen.value,
                     onNavigate = { screen ->
@@ -160,47 +160,11 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun BottomPlayerBar() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-            contentDescription = "Now Playing",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(4.dp))
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = "Starboy",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "The Weeknd, Da...",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-        IconButton(onClick = { /* Play/Pause action */ }) {
-            Icon(
-                painter = painterResource(id = android.R.drawable.ic_media_play),
-                contentDescription = "Play/Pause",
-                tint = MaterialTheme.colorScheme.onSurface
+            BottomPlayerBar(
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                navController = navController,
+                fromScreen = Screen.HOME
             )
         }
     }
@@ -269,7 +233,6 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
     }
 }
 
-// Data class Song tetap ada karena MusicBehaviorViewModel mungkin menggunakannya
 data class Song(
     val id: Int? = null,
     val title: String,

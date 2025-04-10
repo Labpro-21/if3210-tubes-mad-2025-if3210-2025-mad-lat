@@ -121,7 +121,6 @@ fun ProfileScreen(navController: NavHostController) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
-                    // Show loading or some message while redirecting
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center)
                     )
@@ -195,25 +194,6 @@ fun ProfileContent(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // EDIT PROFILE BUTTON (disabled for now as it's not in the spec)
-        Button(
-            onClick = { /* Handle edit profile click */ },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth(0.5f)
-        ) {
-            Text(
-                text = "Edit Profile",
-                fontSize = 16.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         // LOGOUT BUTTON
         OutlinedButton(

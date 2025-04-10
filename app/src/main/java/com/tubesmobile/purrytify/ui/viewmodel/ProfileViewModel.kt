@@ -38,8 +38,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 val error = result.exceptionOrNull()?.message ?: "Unknown error"
                 android.util.Log.e("ProfileViewModel", "Error loading profile: $error")
 
-                // Check if this is a token expiration that requires re-login
-                if (error.contains("please login again")) {
+                if (error.contains("Token expired")) {
                     _profile.value = ProfileState.SessionExpired
                 } else {
                     _profile.value = ProfileState.Error(error)

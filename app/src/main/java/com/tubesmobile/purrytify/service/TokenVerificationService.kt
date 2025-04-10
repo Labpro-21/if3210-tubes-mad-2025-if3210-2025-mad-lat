@@ -13,9 +13,13 @@ import kotlinx.coroutines.*
 class TokenVerificationService : Service() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + job)
+    private var isRunning = false
 
     private lateinit var userRepository: UserRepository
     private lateinit var tokenManager: TokenManager
+
+    // Check interval - 30 seconds
+    private val CHECK_INTERVAL_MS = 30000 * 1000L
 
     override fun onCreate() {
         super.onCreate()
@@ -24,38 +28,54 @@ class TokenVerificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        scope.launch {
-            while (true) {
-                checkToken()
-                delay(60000) // Check every minute
+        if (!isRunning) {
+            isRunning = true
+            scope.launch {
+                startTokenVerification()
             }
         }
         return START_STICKY
     }
 
-    private suspend fun checkToken() {
-        try {
-            val result = userRepository.verifyToken()
-            if (result.isFailure) {
-                // Token might be expired, try to refresh
-                val refreshResult = userRepository.refreshToken()
-                if (refreshResult.isFailure) {
-                    // Refresh failed, logout user
-                    tokenManager.clearTokens()
+    private suspend fun startTokenVerification() {
+        while (isRunning) {
+            if (tokenManager.getToken() != null) {
+                verifyAndRefreshToken()
+            }
+            delay(CHECK_INTERVAL_MS)
+        }
+    }
 
-                    // Send broadcast to notify activities
+    private suspend fun verifyAndRefreshToken() {
+        try {
+            Log.d("TokenService", "Verifying token with server...")
+            val verifyResult = userRepository.verifyToken()
+
+            if (!verifyResult.isSuccess) {
+                Log.d("TokenService", "Token verification failed, attempting refresh")
+                val refreshResult = userRepository.refreshToken()
+
+                if (!refreshResult.isSuccess) {
+                    Log.e("TokenService", "Token refresh failed")
+                    // Force logout on token refresh failure
+                    tokenManager.clearTokens()
                     val intent = Intent(ACTION_LOGOUT)
                     LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+                } else {
+                    Log.d("TokenService", "Token refreshed successfully")
                 }
+            } else {
+                Log.d("TokenService", "Token is valid")
             }
         } catch (e: Exception) {
-            Log.e("TokenService", "Error checking token", e)
+            Log.e("TokenService", "Error during token verification", e)
         }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        isRunning = false
         job.cancel()
         super.onDestroy()
     }
