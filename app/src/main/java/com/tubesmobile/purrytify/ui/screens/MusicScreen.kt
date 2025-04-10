@@ -175,7 +175,7 @@ fun MusicScreen(
                     )
                 } else {
                     Image(
-                        painter = painterResource(id = R.drawable.starboy), // fallback
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground), // fallback
                         contentDescription = "Album Art",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
