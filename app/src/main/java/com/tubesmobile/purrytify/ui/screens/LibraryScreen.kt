@@ -42,7 +42,10 @@ import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
 
 @Composable
-fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
+fun MusicLibraryScreen(
+    navController: NavHostController,
+    musicBehaviorViewModel: MusicBehaviorViewModel
+) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -52,18 +55,26 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
 
     Scaffold(
         bottomBar = {
-            SharedBottomNavigationBar(
-                currentScreen = currentScreen.value,
-                onNavigate = { screen ->
-                    currentScreen.value = screen
-                    when (screen) {
-                        Screen.HOME -> navController.navigate("home")
-                        Screen.LIBRARY -> {}
-                        Screen.PROFILE -> navController.navigate("profile")
-                        Screen.MUSIC -> {}
-                    }
-                },
-            )
+            Column {
+                BottomPlayerBar(
+                    musicBehaviorViewModel = musicBehaviorViewModel,
+                    navController = navController,
+                    fromScreen = Screen.HOME
+                )
+                SharedBottomNavigationBar(
+                    currentScreen = currentScreen.value,
+                    onNavigate = { screen ->
+                        currentScreen.value = screen
+                        when (screen) {
+                            Screen.HOME -> navController.navigate("home")
+                            Screen.LIBRARY -> {}
+                            Screen.PROFILE -> navController.navigate("profile")
+                            Screen.MUSIC -> {}
+                        }
+                    },
+                )
+            }
+
         }
     ) { innerPadding ->
         Column(
@@ -131,11 +142,6 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
                     }
                 }
             }
-            BottomPlayerBar(
-                musicBehaviorViewModel = musicBehaviorViewModel,
-                navController = navController,
-                fromScreen = Screen.LIBRARY
-            )
         }
 
         if (showPopup) {
@@ -151,17 +157,21 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
                     }
             )
 
-            SwipeableUpload (
+            SwipeableUpload(
                 onDismiss = { showPopup = false },
                 onAddSong = { song, onExists ->
-                    musicDbViewModel.checkAndInsertSong(context, song, "13522126@std.stei.itb.ac.id", onExists)
+                    musicDbViewModel.checkAndInsertSong(
+                        context,
+                        song,
+                        "13522126@std.stei.itb.ac.id",
+                        onExists
+                    )
                     showPopup = false
                 }
             )
         }
     }
 }
-
 
 
 @Composable
@@ -211,6 +221,7 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
                     modifier = Modifier.size(56.dp)
                 )
             }
+
             song.artworkUri.isEmpty() -> {
                 Image(
                     painter = painterResource(id = R.drawable.ic_launcher_foreground),
@@ -218,6 +229,7 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
                     modifier = Modifier.size(56.dp)
                 )
             }
+
             else -> {
                 val resId = song.artworkUri.toIntOrNull() ?: R.drawable.ic_launcher_foreground
                 Image(

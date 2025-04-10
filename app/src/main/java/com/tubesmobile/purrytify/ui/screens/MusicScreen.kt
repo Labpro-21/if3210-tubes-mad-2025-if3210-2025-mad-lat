@@ -196,14 +196,14 @@ fun MusicScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = song?.title ?: "Starboy",
+                        text = song?.title ?: "",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = song?.artist ?: "The Weeknd, Daft Punk",
+                        text = song?.artist ?: "",
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 16.sp
                     )

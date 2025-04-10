@@ -122,7 +122,7 @@ fun BottomPlayerBar(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = song?.title ?: "Starboy",
+                    text = song?.title ?: "",
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
@@ -130,7 +130,7 @@ fun BottomPlayerBar(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = song?.artist ?: "The Weeknd, Da...",
+                    text = song?.artist ?: "",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     maxLines = 1,

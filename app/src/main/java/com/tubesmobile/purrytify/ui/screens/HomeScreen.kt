@@ -19,23 +19,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
-import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
@@ -52,11 +52,9 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
         songsList
             .filter { it.id !in timestampMap }
             .sortedByDescending { it.id }
-
     }
     val recentlyPlayedSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
-
         songsList
             .filter { it.id in timestampMap }
             .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
@@ -66,6 +64,11 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     Scaffold(
         bottomBar = {
             Column {
+                BottomPlayerBar(
+                    musicBehaviorViewModel = musicBehaviorViewModel,
+                    navController = navController,
+                    fromScreen = Screen.HOME
+                )
                 SharedBottomNavigationBar(
                     currentScreen = currentScreen.value,
                     onNavigate = { screen ->
@@ -159,20 +162,14 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                         RecentlyPlayedItem(
                             song = song,
                             onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(selectedSong) // Ubah ini
-                                musicBehaviorViewModel.playSong(selectedSong, context) // Konversi ke Song
+                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                                musicBehaviorViewModel.playSong(selectedSong, context)
                                 navController.navigate("music/${Screen.HOME.name}")
                             }
                         )
                     }
                 }
             }
-
-            BottomPlayerBar(
-                musicBehaviorViewModel = musicBehaviorViewModel,
-                navController = navController,
-                fromScreen = Screen.HOME
-            )
         }
     }
 }
