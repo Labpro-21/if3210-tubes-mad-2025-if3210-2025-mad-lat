@@ -71,8 +71,7 @@ fun MusicLibraryScreen(navController: NavHostController, musicBehaviorViewModel:
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
-                .padding(top = 16.dp)
-                .padding(bottom = 56.dp)
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier
