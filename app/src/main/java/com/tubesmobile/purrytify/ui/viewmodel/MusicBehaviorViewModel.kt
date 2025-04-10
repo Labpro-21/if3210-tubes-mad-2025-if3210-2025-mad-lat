@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import com.tubesmobile.purrytify.ui.screens.Song
 import android.media.MediaPlayer
 import android.net.Uri
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,6 +26,16 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _duration = MutableStateFlow(0)
     val duration: StateFlow<Int> = _duration
 
+    private val _playlist = mutableStateListOf<Song>()
+    val playlist: List<Song> get() = _playlist
+
+
+    private var currentIndex = -1
+
+    private val _isShuffle = MutableStateFlow(false)
+    val isShuffle: StateFlow<Boolean> = _isShuffle
+
+
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
 
@@ -38,12 +49,16 @@ class MusicBehaviorViewModel : ViewModel() {
                 start()
                 _duration.value = duration
                 _isPlaying.value = true
+                setOnCompletionListener {
+                    playNext(context)
+                }
             }
             startUpdatingProgress()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+
 
     fun togglePlayPause() {
         mediaPlayer?.let {
@@ -70,10 +85,48 @@ class MusicBehaviorViewModel : ViewModel() {
         }
     }
 
+    fun toggleShuffle() {
+        _isShuffle.value = !_isShuffle.value
+    }
+
+
     fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)
         _currentPosition.value = position
     }
+
+
+    fun setPlaylist(songs: List<Song>) {
+        _playlist.clear()
+        _playlist.addAll(songs)
+    }
+
+    fun playNext(context: Context) {
+        val list = _playlist
+        if (list.isEmpty()) return
+
+        currentIndex = if (_isShuffle.value) {
+            (list.indices - currentIndex).random()
+        } else {
+            (currentIndex + 1) % list.size
+        }
+
+        playSong(list[currentIndex], context)
+    }
+
+    fun playPrevious(context: Context) {
+        val list = _playlist
+        if (list.isEmpty()) return
+
+        currentIndex = if (_isShuffle.value) {
+            (list.indices - currentIndex).random()
+        } else {
+            if (currentIndex - 1 < 0) list.size - 1 else currentIndex - 1
+        }
+
+        playSong(list[currentIndex], context)
+    }
+
 
     override fun onCleared() {
         super.onCleared()
