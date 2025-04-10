@@ -311,19 +311,3 @@ fun formatMillis(millis: Int): String {
     val seconds = (millis / 1000) % 60
     return "%d:%02d".format(minutes, seconds)
 }
-
-//@Preview(showBackground = true)
-//@Composable
-//fun MusicScreenPreview() {
-//    val dummyNavController = rememberNavController()
-//    val previewViewModel: MusicBehaviorViewModel = viewModel()
-//    val context = LocalContext.current
-//
-//     previewViewModel.playSong(Song("Preview Song", "Preview Artist", 300, "",  R.drawable.ic_launcher_foreground.toString()), context)
-//
-//    MusicScreen(
-//        navController = dummyNavController,
-//        sourceScreen = Screen.HOME,
-//        musicBehaviorViewModel = previewViewModel
-//    )
-//}

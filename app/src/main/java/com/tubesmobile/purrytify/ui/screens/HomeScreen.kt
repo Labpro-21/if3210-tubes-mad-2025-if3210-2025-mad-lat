@@ -47,6 +47,13 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
 
+    val newSongs = remember(songsList, songsTimestamp) {
+        val timestampMap = songsTimestamp.associateBy { it.songId }
+        songsList
+            .filter { it.id !in timestampMap }
+            .sortedByDescending { it.id }
+
+    }
     val recentlyPlayedSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
 
@@ -89,7 +96,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (songsList.isEmpty()) {
+            if (newSongs.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -108,13 +115,13 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                     modifier = Modifier.padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(songsList) { song ->
+                    items(newSongs) { song ->
                         NewSongItem(
                             song = song,
                             onClick = { selectedSong ->
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.LIBRARY.name}")
+                                navController.navigate("music/${Screen.HOME.name}")
                             }
                         )
                     }
@@ -154,7 +161,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                             onClick = { selectedSong ->
                                 musicDbViewModel.updateSongTimestamp(selectedSong) // Ubah ini
                                 musicBehaviorViewModel.playSong(selectedSong, context) // Konversi ke Song
-                                navController.navigate("music/${Screen.LIBRARY.name}")
+                                navController.navigate("music/${Screen.HOME.name}")
                             }
                         )
                     }
