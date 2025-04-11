@@ -42,7 +42,7 @@ interface SongDao {
         INNER JOIN liked_songs ON songs.id = liked_songs.songId
         WHERE liked_songs.userEmail = :userEmail
     """)
-    suspend fun getLikedSongs(userEmail: String): List<SongEntity>
+    fun getLikedSongs(userEmail: String): Flow<List<SongEntity>>
 
     @Query("""
         SELECT EXISTS(
