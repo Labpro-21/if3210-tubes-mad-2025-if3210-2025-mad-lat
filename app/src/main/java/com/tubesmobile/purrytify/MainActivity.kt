@@ -157,7 +157,8 @@ fun PurrytifyNavHost(
             )
         }
         composable("profile") {
-            ProfileScreen(navController = navController)
+            ProfileScreen(navController = navController,
+                loginViewModel = loginViewModel)
         }
         composable("music/{sourceScreen}") {
             val sourceScreen = it.arguments?.getString("sourceScreen")?.let { name ->

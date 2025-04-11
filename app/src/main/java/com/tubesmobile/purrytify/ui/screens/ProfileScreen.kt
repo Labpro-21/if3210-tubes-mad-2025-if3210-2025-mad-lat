@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,10 +33,11 @@ import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.data.model.ProfileResponse
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
+import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 
 @Composable
-fun ProfileScreen(navController: NavHostController) {
+fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.PROFILE) }
     val viewModel: ProfileViewModel = viewModel()
     val profileState by viewModel.profile.collectAsState()
@@ -108,6 +110,8 @@ fun ProfileScreen(navController: NavHostController) {
                         profile = profile,
                         onLogout = {
                             viewModel.logout()
+                            loginViewModel.resetLoginState()
+
                             navController.navigate("login") {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -117,6 +121,7 @@ fun ProfileScreen(navController: NavHostController) {
                 is ProfileViewModel.ProfileState.SessionExpired -> {
                     LaunchedEffect(Unit) {
                         // Navigate to login screen
+                        loginViewModel.resetLoginState()
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -247,11 +252,11 @@ fun StatItem(label: String, value: String) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun ProfileScreenPreview() {
-    val navController = rememberNavController()
-    PurrytifyTheme {
-        ProfileScreen(navController)
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun ProfileScreenPreview() {
+//    val navController = rememberNavController()
+//    PurrytifyTheme {
+//        ProfileScreen(navController)
+//    }
+//}

@@ -39,7 +39,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
                 getApplication<Application>().startService(serviceIntent)
 
-                fetchUserEmail()
                 EmailKeeper.email = email
 
                 LoginState.Success
@@ -47,6 +46,10 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 LoginState.Error(result.exceptionOrNull()?.message ?: "Unknown error")
             }
         }
+    }
+
+    fun resetLoginState() {
+        _loginState.value = LoginState.Idle
     }
 
     // Fungsi untuk mengambil email pengguna
