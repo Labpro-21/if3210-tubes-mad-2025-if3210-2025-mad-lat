@@ -35,6 +35,7 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
+import kotlin.math.log
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        loginViewModel.fetchUserEmail()
         super.onCreate(savedInstanceState)
         tokenManager = TokenManager(applicationContext)
 
@@ -143,7 +145,8 @@ fun PurrytifyNavHost(
         composable("home") {
             HomeScreen(
                 navController = navController,
-                musicBehaviorViewModel = musicBehaviorViewModel
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                loginViewModel = loginViewModel
             )
         }
         composable("library") {

@@ -56,7 +56,7 @@ fun MusicLibraryScreen(
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val userEmail by loginViewModel.userEmail.collectAsState()
-    Log.d("loginuhuy", "email di library $userEmail")
+    loginViewModel.fetchUserEmail()
 
     Scaffold(
         bottomBar = {
@@ -176,7 +176,6 @@ fun MusicLibraryScreen(
                     musicDbViewModel.checkAndInsertSong(
                         context,
                         song,
-                        "13522126@std.stei.itb.ac.id",
                         onExists
                     )
                     showPopup = false

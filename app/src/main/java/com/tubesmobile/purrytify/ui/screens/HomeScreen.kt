@@ -42,9 +42,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
+fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel, loginViewModel: LoginViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     var showPopup by remember { mutableStateOf(false) }
@@ -52,6 +53,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    loginViewModel.fetchUserEmail()
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
@@ -335,13 +337,13 @@ data class SongTimestamp(
     val lastPlayedTimestamp: Long? = null
 )
 
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    val navController = rememberNavController()
-    val previewViewModel: MusicBehaviorViewModel = viewModel()
-
-    PurrytifyTheme {
-        HomeScreen(navController, previewViewModel)
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun HomeScreenPreview() {
+//    val navController = rememberNavController()
+//    val previewViewModel: MusicBehaviorViewModel = viewModel()
+//
+//    PurrytifyTheme {
+//        HomeScreen(navController, previewViewModel)
+//    }
+//}
