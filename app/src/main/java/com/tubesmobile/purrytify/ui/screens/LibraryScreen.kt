@@ -40,14 +40,20 @@ import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.SwipeableUpload
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.LibraryViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
+
+enum class PlaybackMode {
+    REPEAT, REPEAT_ONE, SHUFFLE
+}
 
 @Composable
 fun MusicLibraryScreen(
     navController: NavHostController,
     musicBehaviorViewModel: MusicBehaviorViewModel,
-    loginViewModel: LoginViewModel
+    loginViewModel: LoginViewModel,
+    libraryViewModel: LibraryViewModel
 ) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
@@ -57,8 +63,14 @@ fun MusicLibraryScreen(
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val userEmail by loginViewModel.userEmail.collectAsState()
-    var selectedTab by remember { mutableStateOf("All Songs") }
+    val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
+    val selectedTab by libraryViewModel.selectedTab.collectAsState()
     loginViewModel.fetchUserEmail()
+
+    val songsToDisplay = if (selectedTab == "All Songs") songsList else likedSongsList
+    LaunchedEffect(selectedTab, playbackMode) {
+        musicBehaviorViewModel.setPlaylist(songsToDisplay)
+    }
 
     Scaffold(
         bottomBar = {
@@ -120,21 +132,51 @@ fun MusicLibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TabButton(
-                    text = "All Songs",
-                    isSelected = selectedTab == "All Songs",
-                    onClick = { selectedTab = "All Songs" }
-                )
-                TabButton(
-                    text = "Liked Songs",
-                    isSelected = selectedTab == "Liked Songs",
-                    onClick = { selectedTab = "Liked Songs" }
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TabButton(
+                        text = "All Songs",
+                        isSelected = selectedTab == "All Songs",
+                        onClick = { libraryViewModel.setSelectedTab("All Songs") }
+                    )
+                    TabButton(
+                        text = "Liked Songs",
+                        isSelected = selectedTab == "Liked Songs",
+                        onClick = { libraryViewModel.setSelectedTab("Liked Songs") }
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            id = when (playbackMode) {
+                                PlaybackMode.REPEAT -> R.drawable.ic_repeat
+                                PlaybackMode.REPEAT_ONE -> R.drawable.ic_repeatone
+                                PlaybackMode.SHUFFLE -> R.drawable.ic_shuffle
+                            }
+                        ),
+                        contentDescription = "Playback Mode",
+                        tint = if (playbackMode != PlaybackMode.REPEAT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                musicBehaviorViewModel.setPlaybackMode(
+                                    when (playbackMode) {
+                                        PlaybackMode.REPEAT -> PlaybackMode.REPEAT_ONE
+                                        PlaybackMode.REPEAT_ONE -> PlaybackMode.SHUFFLE
+                                        PlaybackMode.SHUFFLE -> PlaybackMode.REPEAT
+                                    }
+                                )
+                            }
+                    )
+                }
             }
 
-            val songsToDisplay = if (selectedTab == "All Songs") songsList else likedSongsList
 
 
             if (songsToDisplay.isEmpty()) {

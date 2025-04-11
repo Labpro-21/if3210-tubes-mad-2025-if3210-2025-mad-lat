@@ -9,6 +9,7 @@ import android.media.MediaPlayer
 import android.net.Uri
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.viewModelScope
+import com.tubesmobile.purrytify.ui.screens.PlaybackMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,10 +28,13 @@ class MusicBehaviorViewModel : ViewModel() {
     val duration: StateFlow<Int> = _duration
 
     private val _playlist = mutableStateListOf<Song>()
-    val playlist: List<Song> get() = _playlist
+//    val playlist: List<Song> get() = _playlist
+
+    private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
+    val playbackMode: StateFlow<PlaybackMode> = _playbackMode
 
 
-    private var currentIndex = -1
+//    private var currentIndex = -1
 
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle
@@ -38,24 +42,38 @@ class MusicBehaviorViewModel : ViewModel() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
+    private var originalPlaylist: List<Song> = emptyList()
+    private var currentPlaylist: List<Song> = emptyList()
+    private var currentIndex: Int = -1
 
     fun playSong(song: Song, context: Context) {
-        _currentSong.value = song
-        try {
+        viewModelScope.launch {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(context, Uri.parse(song.uri))
                 prepare()
                 start()
-                _duration.value = duration
                 _isPlaying.value = true
+                _duration.value = duration
+                currentIndex = currentPlaylist.indexOf(song)
+                _currentSong.value = song
+
                 setOnCompletionListener {
-                    playNext(context)
+                    when (_playbackMode.value) {
+                        PlaybackMode.REPEAT -> playNext(context)
+                        PlaybackMode.REPEAT_ONE -> {
+                            seekTo(0)
+                            start()
+                        }
+                        PlaybackMode.SHUFFLE -> playNext(context)
+                    }
                 }
             }
-            startUpdatingProgress()
-        } catch (e: Exception) {
-            e.printStackTrace()
+
+            while (isPlaying.value) {
+                _currentPosition.value = mediaPlayer?.currentPosition ?: 0
+                kotlinx.coroutines.delay(1000)
+            }
         }
     }
 
@@ -97,39 +115,71 @@ class MusicBehaviorViewModel : ViewModel() {
 
 
     fun setPlaylist(songs: List<Song>) {
-        _playlist.clear()
-        _playlist.addAll(songs)
+        originalPlaylist = songs
+        currentPlaylist = when (_playbackMode.value) {
+            PlaybackMode.SHUFFLE -> songs.shuffled()
+            else -> songs
+        }
+        currentIndex = currentPlaylist.indexOf(_currentSong.value).takeIf { it >= 0 } ?: -1
+    }
+
+    fun setPlaybackMode(mode: PlaybackMode) {
+        _playbackMode.value = mode
+        when (mode) {
+            PlaybackMode.SHUFFLE -> {
+                currentPlaylist = originalPlaylist.shuffled()
+                currentIndex = currentPlaylist.indexOf(_currentSong.value)
+            }
+            PlaybackMode.REPEAT, PlaybackMode.REPEAT_ONE -> {
+                currentPlaylist = originalPlaylist
+                currentIndex = currentPlaylist.indexOf(_currentSong.value)
+            }
+        }
     }
 
     fun playNext(context: Context) {
-        val list = _playlist
-        if (list.isEmpty()) return
-
-        currentIndex = if (_isShuffle.value) {
-            (list.indices - currentIndex).random()
-        } else {
-            (currentIndex + 1) % list.size
+        if (currentPlaylist.isEmpty() || currentIndex < 0) {
+            // If playlist is empty or index is invalid, try to start with the first song
+            if (currentPlaylist.isNotEmpty()) {
+                currentIndex = 0
+                playSong(currentPlaylist[currentIndex], context)
+            }
+            return
         }
-
-        playSong(list[currentIndex], context)
+        currentIndex = if (currentIndex < currentPlaylist.size - 1) {
+            currentIndex + 1
+        } else {
+            if (_playbackMode.value == PlaybackMode.SHUFFLE) {
+                currentPlaylist = originalPlaylist.shuffled()
+                0
+            } else {
+                0
+            }
+        }
+        playSong(currentPlaylist[currentIndex], context)
     }
 
     fun playPrevious(context: Context) {
-        val list = _playlist
-        if (list.isEmpty()) return
-
-        currentIndex = if (_isShuffle.value) {
-            (list.indices - currentIndex).random()
-        } else {
-            if (currentIndex - 1 < 0) list.size - 1 else currentIndex - 1
+        if (currentPlaylist.isEmpty() || currentIndex < 0) {
+            // If playlist is empty or index is invalid, try to start with the last song
+            if (currentPlaylist.isNotEmpty()) {
+                currentIndex = currentPlaylist.size - 1
+                playSong(currentPlaylist[currentIndex], context)
+            }
+            return
         }
-
-        playSong(list[currentIndex], context)
+        currentIndex = if (currentIndex > 0) {
+            currentIndex - 1
+        } else {
+            currentPlaylist.size - 1
+        }
+        playSong(currentPlaylist[currentIndex], context)
     }
 
 
     override fun onCleared() {
-        super.onCleared()
         mediaPlayer?.release()
+        mediaPlayer = null
+        super.onCleared()
     }
 }

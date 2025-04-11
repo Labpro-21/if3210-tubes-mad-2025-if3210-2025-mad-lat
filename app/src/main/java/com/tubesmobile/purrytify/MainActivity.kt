@@ -32,6 +32,7 @@ import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
+import com.tubesmobile.purrytify.ui.viewmodel.LibraryViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
     private val musicDbViewModel by viewModels<MusicDbViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
     private val loginViewModel by viewModels<LoginViewModel>()
+    private val libraryViewModel by viewModels<LibraryViewModel>()
     private lateinit var tokenManager: TokenManager
 
     // Token expiration receiver
@@ -86,7 +88,8 @@ class MainActivity : ComponentActivity() {
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         loginViewModel = loginViewModel,
                         isLoggedIn = tokenManager.getToken() != null,
-                        musicDbViewModel = musicDbViewModel
+                        musicDbViewModel = musicDbViewModel,
+                        libraryViewModel = libraryViewModel
                     )
                 }
             }
@@ -132,6 +135,7 @@ fun PurrytifyNavHost(
     musicBehaviorViewModel: MusicBehaviorViewModel,
     musicDbViewModel: MusicDbViewModel,
     loginViewModel: LoginViewModel,
+    libraryViewModel: LibraryViewModel,
     isLoggedIn: Boolean
 ) {
     val navController = rememberNavController()
@@ -157,7 +161,8 @@ fun PurrytifyNavHost(
             MusicLibraryScreen(
                 navController = navController,
                 musicBehaviorViewModel = musicBehaviorViewModel,
-                loginViewModel = loginViewModel
+                loginViewModel = loginViewModel,
+                libraryViewModel = libraryViewModel
             )
         }
         composable("profile") {
