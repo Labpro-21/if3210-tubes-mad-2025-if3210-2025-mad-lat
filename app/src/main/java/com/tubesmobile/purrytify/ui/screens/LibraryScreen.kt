@@ -3,6 +3,8 @@ package com.tubesmobile.purrytify.ui.screens
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.foundation.Image
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -43,6 +45,7 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MusicLibraryScreen(
     navController: NavHostController,
@@ -58,12 +61,14 @@ fun MusicLibraryScreen(
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val userEmail by loginViewModel.userEmail.collectAsState()
     var selectedTab by remember { mutableStateOf("All Songs") }
+    var searchQuery by remember { mutableStateOf("") }
+
     loginViewModel.fetchUserEmail()
 
     Scaffold(
         bottomBar = {
             Column {
-                if (currentSong != null){
+                if (currentSong != null) {
                     BottomPlayerBar(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         navController = navController,
@@ -84,7 +89,6 @@ fun MusicLibraryScreen(
                     },
                 )
             }
-
         }
     ) { innerPadding ->
         Column(
@@ -134,10 +138,36 @@ fun MusicLibraryScreen(
                 )
             }
 
+            // Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = {
+                    Text("Search songs...")
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search Icon"
+                    )
+                },
+                singleLine = true,
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            )
+
             val songsToDisplay = if (selectedTab == "All Songs") songsList else likedSongsList
+            val filteredSongs = songsToDisplay.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.artist.contains(searchQuery, ignoreCase = true)
+            }
 
-
-            if (songsToDisplay.isEmpty()) {
+            if (filteredSongs.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -145,10 +175,14 @@ fun MusicLibraryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (selectedTab == "All Songs")
-                            "Your library is empty. Tap + to add a song!"
-                        else
-                            "You haven't liked any songs yet.",
+                        text = if (searchQuery.isEmpty()) {
+                            if (selectedTab == "All Songs")
+                                "Your library is empty. Tap + to add a song!"
+                            else
+                                "You haven't liked any songs yet."
+                        } else {
+                            "No songs found."
+                        },
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                         fontSize = 16.sp,
                         textAlign = TextAlign.Center
@@ -161,7 +195,7 @@ fun MusicLibraryScreen(
                         .weight(1f)
                         .padding(horizontal = 16.dp)
                 ) {
-                    items(songsToDisplay) { song ->
+                    items(filteredSongs) { song ->
                         SongItem(
                             song = song,
                             isPlaying = song.uri == currentSong?.uri,
@@ -176,13 +210,6 @@ fun MusicLibraryScreen(
                         )
                     }
                 }
-            }
-        }
-        Column {
-            if (userEmail != null) {
-                Text(text = "Email: $userEmail")
-            } else {
-                Text(text = "Failed to load email")
             }
         }
         if (showPopup) {
