@@ -51,13 +51,13 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 
 @Composable
 fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel, loginViewModel: LoginViewModel) {
+    loginViewModel.userEmail.collectAsState()
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    loginViewModel.fetchUserEmail()
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }

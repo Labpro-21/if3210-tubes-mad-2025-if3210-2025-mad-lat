@@ -59,11 +59,8 @@ fun MusicLibraryScreen(
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    val userEmail by loginViewModel.userEmail.collectAsState()
     var selectedTab by remember { mutableStateOf("All Songs") }
     var searchQuery by remember { mutableStateOf("") }
-
-    loginViewModel.fetchUserEmail()
 
     Scaffold(
         bottomBar = {
