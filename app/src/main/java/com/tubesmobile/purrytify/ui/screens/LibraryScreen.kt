@@ -133,6 +133,7 @@ fun MusicLibraryScreen(
                             isPlaying = song.uri == currentSong?.uri,
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
+                                    musicBehaviorViewModel.setPlaylist(songsList)
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)

@@ -62,6 +62,9 @@ fun MusicScreen(
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
 
+    val context = LocalContext.current
+
+
     val song = currentSong
 
     val gradientColors = listOf(
@@ -175,7 +178,7 @@ fun MusicScreen(
                     )
                 } else {
                     Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground), // fallback
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
                         contentDescription = "Album Art",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -266,13 +269,14 @@ fun MusicScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    // Previous icon
                     painter = painterResource(id = R.drawable.ic_previous),
                     contentDescription = "Previous",
                     tint = Color.White,
                     modifier = Modifier
                         .size(26.dp)
-                        .clickable { /* Previous track */ }
+                        .clickable {
+                            musicBehaviorViewModel.playPrevious(context)
+                        }
                 )
 
                 Box(
@@ -291,13 +295,14 @@ fun MusicScreen(
                 }
 
                 Icon(
-                    // Next icon
                     painter = painterResource(id = R.drawable.ic_skip),
                     contentDescription = "Next",
                     tint = Color.White,
                     modifier = Modifier
                         .size(26.dp)
-                        .clickable { /* Next track */ }
+                        .clickable {
+                            musicBehaviorViewModel.playNext(context)
+                        }
                 )
             }
 

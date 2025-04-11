@@ -1,5 +1,8 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -36,6 +40,8 @@ import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 
 @Composable
 fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel) {
@@ -182,13 +188,51 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
             .clickable { onClick(song) },
         horizontalAlignment = Alignment.Start
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-            contentDescription = song.title,
-            modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(8.dp))
-        )
+        val context = LocalContext.current
+        val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
+        val imageBitmap = imageBitmapState.value
+
+        LaunchedEffect(song?.artworkUri) {
+            imageBitmapState.value = null
+            val retriever = MediaMetadataRetriever()
+            try {
+                if (song?.artworkUri == "Metadata") {
+                    retriever.setDataSource(context, Uri.parse(song.uri))
+                    val art = retriever.embeddedPicture
+                    if (art != null) {
+                        val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                        imageBitmapState.value = bitmap.asImageBitmap()
+                    }
+                } else if (!song?.artworkUri.isNullOrEmpty()) {
+                    val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                    if (fileBitmap != null) {
+                        imageBitmapState.value = fileBitmap.asImageBitmap()
+                    }
+                }
+            } catch (_: Exception) {
+                imageBitmapState.value = null
+            } finally {
+                retriever.release()
+            }
+        }
+        if (imageBitmap != null){
+            Image(
+                bitmap = imageBitmap!!,
+                contentDescription = song.title,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
+        else{
+            Image(
+                painter = painterResource(id =  R.drawable.ic_launcher_foreground),
+                contentDescription = song.title,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = song.title,
@@ -213,13 +257,52 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-            contentDescription = song.title,
-            modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(8.dp))
-        )
+        val context = LocalContext.current
+        val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
+        val imageBitmap = imageBitmapState.value
+
+        LaunchedEffect(song?.artworkUri) {
+            imageBitmapState.value = null
+            val retriever = MediaMetadataRetriever()
+            try {
+                if (song?.artworkUri == "Metadata") {
+                    retriever.setDataSource(context, Uri.parse(song.uri))
+                    val art = retriever.embeddedPicture
+                    if (art != null) {
+                        val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                        imageBitmapState.value = bitmap.asImageBitmap()
+                    }
+                } else if (!song?.artworkUri.isNullOrEmpty()) {
+                    val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                    if (fileBitmap != null) {
+                        imageBitmapState.value = fileBitmap.asImageBitmap()
+                    }
+                }
+            } catch (_: Exception) {
+                imageBitmapState.value = null
+            } finally {
+                retriever.release()
+            }
+        }
+        if (imageBitmap != null){
+            Image(
+                bitmap = imageBitmap!!,
+                contentDescription = song.title,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
+        else{
+            Image(
+                painter = painterResource(id =  R.drawable.ic_launcher_foreground),
+                contentDescription = song.title,
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
+
         Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
