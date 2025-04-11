@@ -139,7 +139,8 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 musicBehaviorViewModel.playSong(selectedSong, context)
                                 navController.navigate("music/${Screen.HOME.name}")
-                            }
+                            },
+                            musicBehaviorViewModel = musicBehaviorViewModel
                         )
                     }
                 }
@@ -179,7 +180,8 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 musicBehaviorViewModel.playSong(selectedSong, context)
                                 navController.navigate("music/${Screen.HOME.name}")
-                            }
+                            },
+                            musicBehaviorViewModel = musicBehaviorViewModel
                         )
                     }
                 }
@@ -189,7 +191,8 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
 }
 
 @Composable
-fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
+fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: MusicBehaviorViewModel) {
+    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     Column(
         modifier = Modifier
             .width(120.dp)
@@ -244,7 +247,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = song.title,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (song.id == currentSong?.id ) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground ,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
@@ -257,7 +260,8 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit) {
 }
 
 @Composable
-fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
+fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: MusicBehaviorViewModel) {
+    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -315,7 +319,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit) {
         Column {
             Text(
                 text = song.title,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = if (song.id == currentSong?.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )

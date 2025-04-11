@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import com.tubesmobile.purrytify.ui.screens.Song
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -35,6 +36,9 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _playlist = mutableStateListOf<Song>()
     val playlist: List<Song> get() = _playlist
 
+    private val _queue = mutableStateListOf<Song>()
+    val queue: List<Song> get() = _queue
+
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
 
@@ -56,12 +60,12 @@ class MusicBehaviorViewModel : ViewModel() {
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(context, Uri.parse(song.uri))
                 prepare()
-                start()
-                _duration.value = duration
-                _isPlaying.value = true
                 setOnCompletionListener {
                     playNext(context)
                 }
+                start()
+                _duration.value = duration
+                _isPlaying.value = true
             }
             startUpdatingProgress()
         } catch (e: Exception) {
@@ -112,12 +116,25 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun playNext(context: Context) {
+        if (_queue.isNotEmpty()) {
+            val nextFromQueue = _queue.removeAt(0)
+            Log.d("QUEUE_DEBUG", "Playing from queue: ${nextFromQueue.title}")
+            playSong(nextFromQueue, context)
+        } else {
+            Log.d("QUEUE_DEBUG", "Queue is empty, playing from playlist")
+            playNextFromPlaylist(context)
+        }
+    }
+
+
+    private fun playNextFromPlaylist(context: Context) {
         val list = _playlist
         if (list.isEmpty()) return
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
                 _currentSong.value?.let {
+                    Log.d("QUEUE_DEBUG", "REPEAT_ONE: Replaying ${it.title}")
                     playSong(it, context)
                 }
             }
@@ -126,12 +143,14 @@ class MusicBehaviorViewModel : ViewModel() {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
+                    Log.d("QUEUE_DEBUG", "SHUFFLE: Playing ${list[currentIndex].title}")
                     playSong(list[currentIndex], context)
                 }
             }
 
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
+                Log.d("QUEUE_DEBUG", "REPEAT: Playing ${list[currentIndex].title}")
                 playSong(list[currentIndex], context)
             }
         }
@@ -155,6 +174,32 @@ class MusicBehaviorViewModel : ViewModel() {
             PlaybackMode.REPEAT -> PlaybackMode.REPEAT_ONE
             PlaybackMode.REPEAT_ONE -> PlaybackMode.SHUFFLE
             PlaybackMode.SHUFFLE -> PlaybackMode.REPEAT
+        }
+    }
+
+    fun addToQueue(song: Song) {
+        _queue.add(song)
+        Log.d("QUEUE_DEBUG", "Added to queue: ${song.title}, new queue size: ${_queue.size}")
+    }
+
+    fun playNextFromQueue(context: Context){
+        if(_queue.isNotEmpty()){
+            val nextSong = _queue.removeAt(0)
+            playSong(nextSong, context)
+        }
+        else{
+            playNext(context)
+        }
+    }
+
+    fun playOrQueueNext(context: Context) {
+        if (_queue.isNotEmpty()) {
+            val nextSong = _queue.removeAt(0)
+            Log.d("QUEUE", "Playing from queue: ${nextSong.title}")
+            playSong(nextSong, context)
+        } else {
+            Log.d("QUEUE", "Queue empty, fallback to playlist next")
+            playNext(context)
         }
     }
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -228,7 +229,9 @@ fun MusicLibraryScreen(
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
-                            }
+                            },
+                            onAddToQueue = { musicBehaviorViewModel.addToQueue(it) }
+
                         )
                     }
                 }
@@ -284,9 +287,10 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
+fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQueue: (Song) -> Unit) {
     val context = LocalContext.current
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
         val file = File(song.artworkUri)
@@ -348,6 +352,25 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp
             )
+        }
+
+        Box {
+            IconButton(onClick = { expanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More Options")
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Add to Queue") },
+                    onClick = {
+                        onAddToQueue(song)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
