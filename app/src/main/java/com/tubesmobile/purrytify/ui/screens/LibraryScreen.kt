@@ -1,6 +1,7 @@
 package com.tubesmobile.purrytify.ui.screens
 
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.SwipeableUpload
+import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
@@ -44,7 +46,8 @@ import java.io.File
 @Composable
 fun MusicLibraryScreen(
     navController: NavHostController,
-    musicBehaviorViewModel: MusicBehaviorViewModel
+    musicBehaviorViewModel: MusicBehaviorViewModel,
+    loginViewModel: LoginViewModel
 ) {
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
@@ -52,6 +55,8 @@ fun MusicLibraryScreen(
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val userEmail by loginViewModel.userEmail.collectAsState()
+    Log.d("loginuhuy", "email di library $userEmail")
 
     Scaffold(
         bottomBar = {
@@ -106,6 +111,7 @@ fun MusicLibraryScreen(
                 }
             }
 
+
             if (songsList.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -143,7 +149,13 @@ fun MusicLibraryScreen(
                 }
             }
         }
-
+        Column {
+            if (userEmail != null) {
+                Text(text = "Email: $userEmail")
+            } else {
+                Text(text = "Failed to load email")
+            }
+        }
         if (showPopup) {
             Box(
                 modifier = Modifier
@@ -263,13 +275,13 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit) {
 }
 
 
-@Preview(showBackground = true)
-@Composable
-fun MusicLibraryScreenPreview() {
-    val navController = rememberNavController()
-    val previewViewModel: MusicBehaviorViewModel = viewModel()
-
-    PurrytifyTheme {
-        MusicLibraryScreen(navController, previewViewModel)
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun MusicLibraryScreenPreview() {
+//    val navController = rememberNavController()
+//    val previewViewModel: MusicBehaviorViewModel = viewModel()
+//
+//    PurrytifyTheme {
+//        MusicLibraryScreen(navController, previewViewModel)
+//    }
+//}

@@ -34,9 +34,8 @@ import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.util.NetworkConnectivityManager
 
 @Composable
-fun LoginScreen(navController: NavHostController) {
-    val viewModel: LoginViewModel = viewModel()
-    val loginState by viewModel.loginState.collectAsState()
+fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel) {
+    val loginState by loginViewModel.loginState.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -203,7 +202,7 @@ fun LoginScreen(navController: NavHostController) {
             // LOGIN BUTTON
             Button(
                 onClick = {
-                    viewModel.login(email, password)
+                    loginViewModel.login(email, password)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -240,11 +239,11 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    val navController = rememberNavController()
-    PurrytifyTheme {
-        LoginScreen(navController)
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun LoginScreenPreview() {
+//    val navController = rememberNavController()
+//    PurrytifyTheme {
+//        LoginScreen(navController, loginViewModel)
+//    }
+//}
