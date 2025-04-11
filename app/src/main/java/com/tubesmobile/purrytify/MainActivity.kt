@@ -15,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -23,20 +24,22 @@ import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.service.PermissionManager
 import com.tubesmobile.purrytify.service.TokenVerificationService
-import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.HomeScreen
+import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
 import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
+import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
+    private val loginViewModel by viewModels<LoginViewModel>()
     private lateinit var tokenManager: TokenManager
 
     // Token expiration receiver
@@ -76,8 +79,10 @@ class MainActivity : ComponentActivity() {
                     LocalNetworkStatus provides networkViewModel.isConnected
                 ) {
                     PurrytifyNavHost(
-                        musicBehaviorViewModel,
-                        isLoggedIn = tokenManager.getToken() != null)
+                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        loginViewModel = loginViewModel,
+                        isLoggedIn = tokenManager.getToken() != null
+                    )
                 }
             }
         }
@@ -118,7 +123,11 @@ fun TokenExpirationHandler(navController: NavHostController) {
 }
 
 @Composable
-fun PurrytifyNavHost(musicBehaviorViewModel: MusicBehaviorViewModel, isLoggedIn: Boolean) {
+fun PurrytifyNavHost(
+    musicBehaviorViewModel: MusicBehaviorViewModel,
+    loginViewModel: LoginViewModel,
+    isLoggedIn: Boolean
+) {
     val navController = rememberNavController()
 
     // Add this line to handle token expiration within the composable hierarchy
@@ -129,13 +138,20 @@ fun PurrytifyNavHost(musicBehaviorViewModel: MusicBehaviorViewModel, isLoggedIn:
         startDestination = if (isLoggedIn) "home" else "login"
     ) {
         composable("login") {
-            LoginScreen(navController = navController)
+            LoginScreen(navController = navController, loginViewModel = loginViewModel)
         }
         composable("home") {
-            HomeScreen(navController = navController, musicBehaviorViewModel = musicBehaviorViewModel)
+            HomeScreen(
+                navController = navController,
+                musicBehaviorViewModel = musicBehaviorViewModel
+            )
         }
         composable("library") {
-            MusicLibraryScreen(navController = navController, musicBehaviorViewModel = musicBehaviorViewModel)
+            MusicLibraryScreen(
+                navController = navController,
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                loginViewModel = loginViewModel // Gunakan instance loginViewModel
+            )
         }
         composable("profile") {
             ProfileScreen(navController = navController)

@@ -2,6 +2,7 @@ package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.api.RetrofitClient
@@ -23,6 +24,10 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
 
+    // State baru untuk menyimpan email pengguna
+    private val _userEmail = MutableStateFlow<String?>(null)
+    val userEmail: StateFlow<String?> = _userEmail
+
     fun login(email: String, password: String) {
         _loginState.value = LoginState.Loading
 
@@ -33,10 +38,28 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
                 getApplication<Application>().startService(serviceIntent)
 
+                // Ambil email setelah login sukses
+                fetchUserEmail()
+
                 LoginState.Success
             } else {
                 LoginState.Error(result.exceptionOrNull()?.message ?: "Unknown error")
             }
+        }
+    }
+
+    // Fungsi untuk mengambil email pengguna
+    fun fetchUserEmail() {
+        viewModelScope.launch {
+            Log.d("loginuhuy", "masuk fungsi fetch")
+            val result = repository.getProfile()
+            Log.d("loginuhuy", "isi dari result ${result}")
+            _userEmail.value = if (result.isSuccess) {
+                result.getOrNull()?.email // Ambil field email dari ProfileResponse
+            } else {
+                null
+            }
+            Log.d("loginuhuy", "isi dari email ${result.getOrNull()?.email}")
         }
     }
 
