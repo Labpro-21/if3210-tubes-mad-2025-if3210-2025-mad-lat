@@ -53,19 +53,24 @@ fun MusicLibraryScreen(
     var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
+    val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val userEmail by loginViewModel.userEmail.collectAsState()
+    var selectedTab by remember { mutableStateOf("All Songs") }
     loginViewModel.fetchUserEmail()
 
     Scaffold(
         bottomBar = {
             Column {
-                BottomPlayerBar(
-                    musicBehaviorViewModel = musicBehaviorViewModel,
-                    navController = navController,
-                    fromScreen = Screen.HOME
-                )
+                if (currentSong != null){
+                    BottomPlayerBar(
+                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        navController = navController,
+                        fromScreen = Screen.HOME
+                    )
+                }
+
                 SharedBottomNavigationBar(
                     currentScreen = currentScreen.value,
                     onNavigate = { screen ->
@@ -111,8 +116,28 @@ fun MusicLibraryScreen(
                 }
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TabButton(
+                    text = "All Songs",
+                    isSelected = selectedTab == "All Songs",
+                    onClick = { selectedTab = "All Songs" }
+                )
+                TabButton(
+                    text = "Liked Songs",
+                    isSelected = selectedTab == "Liked Songs",
+                    onClick = { selectedTab = "Liked Songs" }
+                )
+            }
 
-            if (songsList.isEmpty()) {
+            val songsToDisplay = if (selectedTab == "All Songs") songsList else likedSongsList
+
+
+            if (songsToDisplay.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -120,7 +145,10 @@ fun MusicLibraryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Your library is empty. Tap + to add a song!",
+                        text = if (selectedTab == "All Songs")
+                            "Your library is empty. Tap + to add a song!"
+                        else
+                            "You haven't liked any songs yet.",
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                         fontSize = 16.sp,
                         textAlign = TextAlign.Center
@@ -133,13 +161,13 @@ fun MusicLibraryScreen(
                         .weight(1f)
                         .padding(horizontal = 16.dp)
                 ) {
-                    items(songsList) { song ->
+                    items(songsToDisplay) { song ->
                         SongItem(
                             song = song,
                             isPlaying = song.uri == currentSong?.uri,
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
-                                    musicBehaviorViewModel.setPlaylist(songsList)
+                                    musicBehaviorViewModel.setPlaylist(songsToDisplay)
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
@@ -187,15 +215,16 @@ fun MusicLibraryScreen(
 
 
 @Composable
-fun TabButton(text: String, isSelected: Boolean) {
+fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
     Button(
-        onClick = { /* Handle tab click */ },
+        onClick = onClick,
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
         ),
         modifier = Modifier
             .height(36.dp)
+            .width(130.dp)
     ) {
         Text(
             text = text,

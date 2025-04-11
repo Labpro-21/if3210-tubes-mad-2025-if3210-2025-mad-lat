@@ -35,10 +35,12 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlin.math.log
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
+    private val musicDbViewModel by viewModels<MusicDbViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
     private val loginViewModel by viewModels<LoginViewModel>()
     private lateinit var tokenManager: TokenManager
@@ -83,7 +85,8 @@ class MainActivity : ComponentActivity() {
                     PurrytifyNavHost(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         loginViewModel = loginViewModel,
-                        isLoggedIn = tokenManager.getToken() != null
+                        isLoggedIn = tokenManager.getToken() != null,
+                        musicDbViewModel = musicDbViewModel
                     )
                 }
             }
@@ -127,6 +130,7 @@ fun TokenExpirationHandler(navController: NavHostController) {
 @Composable
 fun PurrytifyNavHost(
     musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicDbViewModel: MusicDbViewModel,
     loginViewModel: LoginViewModel,
     isLoggedIn: Boolean
 ) {
@@ -153,7 +157,7 @@ fun PurrytifyNavHost(
             MusicLibraryScreen(
                 navController = navController,
                 musicBehaviorViewModel = musicBehaviorViewModel,
-                loginViewModel = loginViewModel // Gunakan instance loginViewModel
+                loginViewModel = loginViewModel
             )
         }
         composable("profile") {
@@ -167,7 +171,8 @@ fun PurrytifyNavHost(
             MusicScreen(
                 navController = navController,
                 sourceScreen = sourceScreen,
-                musicBehaviorViewModel = musicBehaviorViewModel
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                musicDbViewModel = musicDbViewModel
             )
         }
     }
