@@ -42,6 +42,7 @@ import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.SwipeableUpload
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.PlaybackMode
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.io.File
 
@@ -61,6 +62,7 @@ fun MusicLibraryScreen(
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     var selectedTab by remember { mutableStateOf("All Songs") }
     var searchQuery by remember { mutableStateOf("") }
+    val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -121,19 +123,42 @@ fun MusicLibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TabButton(
                     text = "All Songs",
                     isSelected = selectedTab == "All Songs",
                     onClick = { selectedTab = "All Songs" }
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 TabButton(
                     text = "Liked Songs",
                     isSelected = selectedTab == "Liked Songs",
                     onClick = { selectedTab = "Liked Songs" }
                 )
+
+                Spacer(modifier = Modifier.weight(1f)) // Dorong IconButton ke ujung kanan
+
+                IconButton(
+                    onClick = { musicBehaviorViewModel.cyclePlaybackMode() },
+                    modifier = Modifier
+                        .size(36.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            id = when (playbackMode) {
+                                PlaybackMode.REPEAT -> R.drawable.ic_repeat
+                                PlaybackMode.REPEAT_ONE -> R.drawable.ic_repeatone
+                                PlaybackMode.SHUFFLE -> R.drawable.ic_shuffle
+                            }
+                        ),
+                        contentDescription = "Playback Mode",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
+
+
 
             // Search Bar
             OutlinedTextField(

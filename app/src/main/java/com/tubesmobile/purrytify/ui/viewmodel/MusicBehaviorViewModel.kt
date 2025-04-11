@@ -13,6 +13,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+enum class PlaybackMode {
+    REPEAT,
+    REPEAT_ONE,
+    SHUFFLE
+}
+
 class MusicBehaviorViewModel : ViewModel() {
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong
@@ -29,6 +35,9 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _playlist = mutableStateListOf<Song>()
     val playlist: List<Song> get() = _playlist
 
+    private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
+    val playbackMode: StateFlow<PlaybackMode> = _playbackMode
+
 
     private var currentIndex = -1
 
@@ -41,6 +50,7 @@ class MusicBehaviorViewModel : ViewModel() {
 
     fun playSong(song: Song, context: Context) {
         _currentSong.value = song
+        currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
@@ -105,13 +115,26 @@ class MusicBehaviorViewModel : ViewModel() {
         val list = _playlist
         if (list.isEmpty()) return
 
-        currentIndex = if (_isShuffle.value) {
-            (list.indices - currentIndex).random()
-        } else {
-            (currentIndex + 1) % list.size
-        }
+        when (_playbackMode.value) {
+            PlaybackMode.REPEAT_ONE -> {
+                _currentSong.value?.let {
+                    playSong(it, context)
+                }
+            }
 
-        playSong(list[currentIndex], context)
+            PlaybackMode.SHUFFLE -> {
+                val indices = list.indices - currentIndex
+                if (indices.isNotEmpty()) {
+                    currentIndex = indices.random()
+                    playSong(list[currentIndex], context)
+                }
+            }
+
+            PlaybackMode.REPEAT -> {
+                currentIndex = (currentIndex + 1) % list.size
+                playSong(list[currentIndex], context)
+            }
+        }
     }
 
     fun playPrevious(context: Context) {
@@ -125,6 +148,14 @@ class MusicBehaviorViewModel : ViewModel() {
         }
 
         playSong(list[currentIndex], context)
+    }
+
+    fun cyclePlaybackMode() {
+        _playbackMode.value = when (_playbackMode.value) {
+            PlaybackMode.REPEAT -> PlaybackMode.REPEAT_ONE
+            PlaybackMode.REPEAT_ONE -> PlaybackMode.SHUFFLE
+            PlaybackMode.SHUFFLE -> PlaybackMode.REPEAT
+        }
     }
 
 
