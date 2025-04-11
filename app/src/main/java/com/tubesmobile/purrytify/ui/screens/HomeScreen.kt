@@ -4,6 +4,11 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,7 +53,6 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel, loginViewModel: LoginViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
-    var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
@@ -72,11 +76,13 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
     Scaffold(
         bottomBar = {
             Column {
-                BottomPlayerBar(
-                    musicBehaviorViewModel = musicBehaviorViewModel,
-                    navController = navController,
-                    fromScreen = Screen.HOME
-                )
+                if (currentSong != null){
+                    BottomPlayerBar(
+                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        navController = navController,
+                        fromScreen = Screen.LIBRARY
+                    )
+                }
                 SharedBottomNavigationBar(
                     currentScreen = currentScreen.value,
                     onNavigate = { screen ->

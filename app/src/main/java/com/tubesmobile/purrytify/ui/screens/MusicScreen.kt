@@ -28,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -48,12 +49,14 @@ import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 
 @Composable
 fun MusicScreen(
     navController: NavHostController,
     sourceScreen: Screen,
-    musicBehaviorViewModel: MusicBehaviorViewModel
+    musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicDbViewModel: MusicDbViewModel
 ) {
     // Collect the current song from the ViewModel
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
@@ -61,6 +64,8 @@ fun MusicScreen(
 
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
+
+    var isLiked by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -73,6 +78,12 @@ fun MusicScreen(
         Color(0xFF53062B),
         Color(0xFF04061D)
     )
+
+    LaunchedEffect(song?.id) {
+        song?.id?.let { songId ->
+            isLiked = musicDbViewModel.isSongLiked(songId)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -214,12 +225,17 @@ fun MusicScreen(
 
                 Icon(
                     // Heart/like icon
-                    painter = painterResource(id = R.drawable.ic_heart),
+                    painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
                     contentDescription = "Like",
                     tint = Color.White,
                     modifier = Modifier
                         .size(24.dp)
-                        .clickable { /* Toggle like */ }
+                        .clickable {
+                            song?.let {
+                                musicDbViewModel.toggleSongLike(it)
+                                isLiked = !isLiked
+                            }
+                        }
                 )
             }
 

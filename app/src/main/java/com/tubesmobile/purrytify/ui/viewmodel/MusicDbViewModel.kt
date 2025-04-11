@@ -11,6 +11,7 @@ import com.tubesmobile.purrytify.data.api.RetrofitClient
 import com.tubesmobile.purrytify.data.local.TokenManager
 import kotlinx.coroutines.flow.first
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
+import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
 import com.tubesmobile.purrytify.data.local.db.entities.SongEntity
 import com.tubesmobile.purrytify.data.local.db.entities.SongPlayTimestamp
 import com.tubesmobile.purrytify.data.local.db.entities.SongUploader
@@ -116,7 +117,7 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                     artist = song.artist,
                     duration = song.duration,
                     uri = song.uri,
-                    artworkUri = savedArtworkPath // 👈 pakai path lokal
+                    artworkUri = savedArtworkPath
                 )
                 val newId = songDao.insertSong(entity).toInt()
                 songDao.registerUserToSong(EmailKeeper.email.toString(), newId)
@@ -137,6 +138,41 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 songDao.updateTimestamp(songTimestamp)
             } else {
                 songDao.insertTimestamp(songTimestamp)
+            }
+        }
+    }
+
+    val likedSongs: Flow<List<Song>> =
+        songDao.getSongsByUser(EmailKeeper.email.toString()).map { entities ->
+            entities.filter { entity ->
+                songDao.isSongLiked(EmailKeeper.email.toString(), entity.id)
+            }.map { entity ->
+                Song(
+                    id = entity.id,
+                    title = entity.title,
+                    artist = entity.artist,
+                    duration = entity.duration,
+                    uri = entity.uri,
+                    artworkUri = entity.artworkUri ?: ""
+                )
+            }
+        }
+
+    suspend fun isSongLiked(songId: Int): Boolean {
+        return songDao.isSongLiked(EmailKeeper.email.toString(), songId)
+    }
+
+    // New: Toggle like status
+    fun toggleSongLike(song: Song) {
+        viewModelScope.launch {
+            if (song.id == null) return@launch
+            val isLiked = songDao.isSongLiked(EmailKeeper.email.toString(), song.id)
+            val crossRef = LikedSongCrossRef(EmailKeeper.email.toString(), song.id)
+
+            if (isLiked) {
+                songDao.unlikeSong(crossRef)
+            } else {
+                songDao.likeSong(crossRef)
             }
         }
     }
