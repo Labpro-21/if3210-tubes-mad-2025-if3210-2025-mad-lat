@@ -10,6 +10,7 @@ import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.data.repository.UserRepository
 import com.tubesmobile.purrytify.service.TokenVerificationService
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.tubesmobile.purrytify.service.EmailKeeper
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -38,8 +39,8 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
                 getApplication<Application>().startService(serviceIntent)
 
-                // Ambil email setelah login sukses
                 fetchUserEmail()
+                EmailKeeper.email = email
 
                 LoginState.Success
             } else {
@@ -51,15 +52,13 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     // Fungsi untuk mengambil email pengguna
     fun fetchUserEmail() {
         viewModelScope.launch {
-            Log.d("loginuhuy", "masuk fungsi fetch")
             val result = repository.getProfile()
-            Log.d("loginuhuy", "isi dari result ${result}")
             _userEmail.value = if (result.isSuccess) {
                 result.getOrNull()?.email // Ambil field email dari ProfileResponse
             } else {
                 null
             }
-            Log.d("loginuhuy", "isi dari email ${result.getOrNull()?.email}")
+            EmailKeeper.email = result.getOrNull()?.email
         }
     }
 
