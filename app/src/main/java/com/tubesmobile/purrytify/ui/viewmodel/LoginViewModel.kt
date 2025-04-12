@@ -40,7 +40,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
                 getApplication<Application>().startService(serviceIntent)
 
-                DataKeeper.email = email
+                fetchUserEmail()
 
                 LoginState.Success
             } else {
