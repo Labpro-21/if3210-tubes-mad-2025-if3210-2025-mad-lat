@@ -2,7 +2,6 @@ package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
 import android.content.Intent
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.api.RetrofitClient
@@ -10,7 +9,7 @@ import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.data.repository.UserRepository
 import com.tubesmobile.purrytify.service.TokenVerificationService
 import kotlinx.coroutines.flow.MutableStateFlow
-import com.tubesmobile.purrytify.service.EmailKeeper
+import com.tubesmobile.purrytify.service.DataKeeper
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -39,7 +38,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
                 getApplication<Application>().startService(serviceIntent)
 
-                EmailKeeper.email = email
+                DataKeeper.email = email
 
                 LoginState.Success
             } else {
@@ -61,7 +60,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 null
             }
-            EmailKeeper.email = result.getOrNull()?.email
+            DataKeeper.email = result.getOrNull()?.email
         }
     }
 

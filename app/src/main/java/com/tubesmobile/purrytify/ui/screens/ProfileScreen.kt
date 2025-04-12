@@ -31,17 +31,35 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.data.model.ProfileResponse
+import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import kotlin.collections.contains
 
 @Composable
 fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.PROFILE) }
     val viewModel: ProfileViewModel = viewModel()
+    val musicDbViewModel: MusicDbViewModel = viewModel()
     val profileState by viewModel.profile.collectAsState()
     val isConnected by LocalNetworkStatus.current.collectAsState()
+    val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
+    val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
+    val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
+
+    val newSongs = remember(songsList, songsTimestamp) {
+        val timestampMap = songsTimestamp.associateBy { it.songId }
+        songsList
+            .filter { it.id !in timestampMap }
+            .sortedByDescending { it.id }
+    }
+
+    DataKeeper.songsAmount = songsList.size
+    DataKeeper.likesAmount = likedSongsList.size
+    DataKeeper.listenedAmount = songsList.size - newSongs.size
 
     LaunchedEffect(key1 = Unit) {
         viewModel.loadProfile()
@@ -225,9 +243,9 @@ fun ProfileContent(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            StatItem(label = "SONGS", value = "135")
-            StatItem(label = "LIKED", value = "32")
-            StatItem(label = "LISTENED", value = "50")
+            StatItem(label = "SONGS", value = DataKeeper.songsAmount.toString())
+            StatItem(label = "LIKED", value = DataKeeper.likesAmount.toString())
+            StatItem(label = "LISTENED", value = DataKeeper.listenedAmount.toString())
         }
     }
 
