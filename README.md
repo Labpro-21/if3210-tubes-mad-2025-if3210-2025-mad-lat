@@ -77,10 +77,10 @@ Install `app.apk`
 <img src="./screenshots/library_all.jpg" width="300">
 <img src="./screenshots/library_liked.jpg" width="300">
 <img src="./screenshots/profile.jpg" width="300">
-<img src="./screenshots/upload_song.jpg" width="300">
+<img src="./screenshots/upload.jpg" width="300">
 <img src="./screenshots/music_screen.jpg" width="300">
-<img src="./screenshots/edit_song.jpg" width="300">
-<img src="./screenshots/delete_song_popup.jpg" width="300">
+<img src="./screenshots/edit.jpg" width="300">
+<img src="./screenshots/delete_popup.jpg" width="300">
 
 ## ✨ Pembagian Kerja Kelompok
 
