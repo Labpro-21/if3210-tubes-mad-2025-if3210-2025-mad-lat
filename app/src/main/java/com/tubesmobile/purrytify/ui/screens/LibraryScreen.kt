@@ -396,22 +396,27 @@ fun SongItem(
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        imageBitmap = null
-        if (song.artworkUri.isNotEmpty() && isSafeFilePath(song.artworkUri)) {
+        if (song.artworkUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
-                val file = File(song.artworkUri)
-                if (file.exists() && file.length() <= 5 * 1024 * 1024) { // Batas ukuran file 5MB
-                    try {
+                try {
+                    val file = File(song.artworkUri)
+                    if (file.exists()) {
                         val options = BitmapFactory.Options().apply {
-                            inSampleSize = 2 // Mengurangi penggunaan memori
+                            inSampleSize = 2  // Scale down to use less memory
                         }
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
                         if (bitmap != null) {
-                            imageBitmap = bitmap.asImageBitmap()
+                            withContext(Dispatchers.Main) {
+                                imageBitmap = bitmap.asImageBitmap()
+                            }
+                        } else {
+                            Log.w("SongItem", "Failed to decode bitmap from: ${song.artworkUri}")
                         }
-                    } catch (e: Exception) {
-                        // Logging minimal untuk produksi
+                    } else {
+                        Log.w("SongItem", "Artwork file not found: ${song.artworkUri}")
                     }
+                } catch (e: Exception) {
+                    Log.e("SongItem", "Error loading artwork: ${e.message}", e)
                 }
             }
         }

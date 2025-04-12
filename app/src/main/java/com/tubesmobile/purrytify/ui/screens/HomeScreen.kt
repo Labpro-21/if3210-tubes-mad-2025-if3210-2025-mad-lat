@@ -259,23 +259,17 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
             if (song.artworkUri.isNotEmpty()) {
                 val retriever = MediaMetadataRetriever()
                 try {
-                    val uri = Uri.parse(song.uri)
-                    if (!isValidUri(uri, context.contentResolver)) {
-                        return@LaunchedEffect
-                    }
-
-                    if (song.artworkUri == "Metadata") {
-                        retriever.setDataSource(context, uri)
+                    if (song?.artworkUri == "Metadata") {
+                        retriever.setDataSource(context, Uri.parse(song.uri))
                         val art = retriever.embeddedPicture
-                        if (art != null && art.size <= 5 * 1024 * 1024) { // batas ukuran 5mb
+                        if (art != null) {
                             val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                            imageBitmapState.value = bitmap?.asImageBitmap()
+                            imageBitmapState.value = bitmap.asImageBitmap()
                         }
-                    } else {
-                        val file = File(song.artworkUri)
-                        if (file.exists() && isSafeFilePath(file.absolutePath) && file.length() <= 5 * 1024 * 1024) {
-                            val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
-                            imageBitmapState.value = fileBitmap?.asImageBitmap()
+                    } else if (!song?.artworkUri.isNullOrEmpty()) {
+                        val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                        if (fileBitmap != null) {
+                            imageBitmapState.value = fileBitmap.asImageBitmap()
                         }
                     }
                 } catch (e: SecurityException) {
@@ -339,23 +333,17 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
             if (song.artworkUri.isNotEmpty()) {
                 val retriever = MediaMetadataRetriever()
                 try {
-                    val uri = Uri.parse(song.uri)
-                    if (!isValidUri(uri, context.contentResolver)) {
-                        return@LaunchedEffect
-                    }
-
-                    if (song.artworkUri == "Metadata") {
-                        retriever.setDataSource(context, uri)
+                    if (song?.artworkUri == "Metadata") {
+                        retriever.setDataSource(context, Uri.parse(song.uri))
                         val art = retriever.embeddedPicture
-                        if (art != null && art.size <= 5 * 1024 * 1024) { // batas ukuran 5mb
+                        if (art != null) {
                             val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                            imageBitmapState.value = bitmap?.asImageBitmap()
+                            imageBitmapState.value = bitmap.asImageBitmap()
                         }
-                    } else {
-                        val file = File(song.artworkUri)
-                        if (file.exists() && isSafeFilePath(file.absolutePath) && file.length() <= 5 * 1024 * 1024) {
-                            val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
-                            imageBitmapState.value = fileBitmap?.asImageBitmap()
+                    } else if (!song?.artworkUri.isNullOrEmpty()) {
+                        val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                        if (fileBitmap != null) {
+                            imageBitmapState.value = fileBitmap.asImageBitmap()
                         }
                     }
                 } catch (e: SecurityException) {
