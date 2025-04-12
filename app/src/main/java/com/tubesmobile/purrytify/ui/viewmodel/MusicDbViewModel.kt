@@ -1,11 +1,10 @@
 package com.tubesmobile.purrytify.viewmodel
 
 import android.app.Application
+import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.util.Log
-import androidx.core.net.toFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -19,23 +18,21 @@ import com.tubesmobile.purrytify.ui.screens.SongTimestamp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
+import java.util.regex.Pattern
 
 class MusicDbViewModel(application: Application) : AndroidViewModel(application) {
-    private val songDao = AppDatabase.Companion.getDatabase(application).songDao()
+    private val songDao = AppDatabase.getDatabase(application).songDao()
     private val appContext = application.applicationContext
 
     val allSongs: Flow<List<Song>> =
-        songDao.getSongsByUser(DataKeeper.email.toString()).map { entities ->
+        songDao.getSongsByUser(sanitizeText(DataKeeper.email ?: "")).map { entities ->
             entities.map { entity ->
                 Song(
                     id = entity.id,
-                    title = entity.title,
-                    artist = entity.artist,
+                    title = sanitizeText(entity.title),
+                    artist = sanitizeText(entity.artist),
                     duration = entity.duration,
                     uri = entity.uri,
                     artworkUri = entity.artworkUri ?: ""
@@ -44,90 +41,84 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         }
 
     val songsTimestamp: Flow<List<SongTimestamp>> =
-        songDao.getSongsTimestampByEmail(DataKeeper.email.toString()).map { entities ->
+        songDao.getSongsTimestampByEmail(sanitizeText(DataKeeper.email ?: "")).map { entities ->
             entities.map { entity ->
                 SongTimestamp(
-                    userEmail = entity.userEmail,
+                    userEmail = sanitizeText(entity.userEmail),
                     songId = entity.songId,
                     lastPlayedTimestamp = entity.lastPlayedTimestamp,
                 )
             }
         }
 
-
-    // Improved artwork extraction method with better error handling
     fun extractAndSaveArtwork(context: Context, uri: Uri): String? {
+        if (!isValidUri(uri, context.contentResolver)) {
+            return null
+        }
+
         val retriever = MediaMetadataRetriever()
         try {
-            Log.d("ArtworkFix", "Trying to extract artwork from: $uri")
             retriever.setDataSource(context, uri)
-
             val embeddedArt = try {
                 retriever.embeddedPicture
             } catch (e: Exception) {
-                Log.d("ArtworkFix", "No embedded artwork found: ${e.message}")
                 null
             }
-
-            if (embeddedArt != null && embeddedArt.isNotEmpty()) {
-                val filename = "artwork_${System.currentTimeMillis()}.jpg"
+            if (embeddedArt != null && embeddedArt.size <= 5 * 1024 * 1024) {
+                val filename = "artwork_${System.currentTimeMillis()}_${sanitizeFileName(uri.lastPathSegment ?: "artwork")}.jpg"
                 val file = File(context.filesDir, filename)
                 file.writeBytes(embeddedArt)
-                Log.d("ArtworkFix", "Saved embedded artwork to: ${file.absolutePath}")
                 return file.absolutePath
             }
-
             return null
         } catch (e: Exception) {
-            Log.d("ArtworkFix", "Couldn't extract artwork: ${e.message}")
             return null
         } finally {
             try {
                 retriever.release()
             } catch (e: Exception) {
+                // Handle silently
             }
         }
     }
 
-
-
     fun saveArtworkFromUri(context: Context, artworkUri: Uri): String? {
+        if (!isValidUri(artworkUri, context.contentResolver)) {
+            return null
+        }
         try {
-            Log.d("ArtworkFix", "Saving artwork from: $artworkUri")
-
-            val inputStream = context.contentResolver.openInputStream(artworkUri)
-                ?: return null
-
-            val filename = "artwork_${System.currentTimeMillis()}.jpg"
+            val inputStream = context.contentResolver.openInputStream(artworkUri) ?: return null
+            val filename = "artwork_${System.currentTimeMillis()}_${sanitizeFileName(artworkUri.lastPathSegment ?: "artwork")}.jpg"
             val file = File(context.filesDir, filename)
-
-            // Copy the file contents
+            if (file.length() > 5 * 1024 * 1024) {
+                inputStream.close()
+                return null
+            }
             FileOutputStream(file).use { outputStream ->
                 inputStream.use { input ->
                     input.copyTo(outputStream)
                 }
             }
-
-            Log.d("ArtworkFix", "Saved artwork to: ${file.absolutePath}")
             return file.absolutePath
         } catch (e: Exception) {
-            Log.e("ArtworkFix", "Failed to save artwork: ${e.message}")
             return null
         }
     }
 
-    fun insertSong(song: Song, userEmail: String){
+    fun insertSong(song: Song, userEmail: String) {
+        if (!isValidSong(song) || !isValidEmail(userEmail)) {
+            return
+        }
         viewModelScope.launch {
             val entity = SongEntity(
-                title = song.title,
-                artist = song.artist,
+                title = sanitizeText(song.title),
+                artist = sanitizeText(song.artist),
                 duration = song.duration,
                 uri = song.uri,
                 artworkUri = song.artworkUri
             )
-
             val newId = songDao.insertSong(entity).toInt()
-            songDao.registerUserToSong(userEmail, newId)
+            songDao.registerUserToSong(sanitizeText(userEmail), newId)
         }
     }
 
@@ -137,65 +128,61 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         onSuccess: () -> Unit,
         onExists: () -> Unit
     ) {
+        if (!isValidSong(song) || !isValidEmail(DataKeeper.email ?: "")) {
+            return
+        }
         viewModelScope.launch {
-            val existsForUser = songDao.isSongExistsForUser(song.title, song.artist, DataKeeper.email.toString())
-            val exists = songDao.isSongExists(song.title, song.artist)
-
+            val sanitizedEmail = sanitizeText(DataKeeper.email ?: "")
+            val sanitizedTitle = sanitizeText(song.title)
+            val sanitizedArtist = sanitizeText(song.artist)
+            val existsForUser = songDao.isSongExistsForUser(
+                sanitizedTitle,
+                sanitizedArtist,
+                sanitizedEmail
+            )
+            val exists = songDao.isSongExists(sanitizedTitle, sanitizedArtist)
             if (existsForUser) {
                 onExists()
             } else {
                 if (exists) {
-                    val songId = songDao.getSongId(song.title, song.artist)
-                    val registerUploader = SongUploader(
-                        uploaderEmail = DataKeeper.email.toString(),
-                        songId = songId
-                    )
-                    songDao.registerUserToSong(registerUploader.uploaderEmail, registerUploader.songId)
+                    val songId = songDao.getSongId(sanitizedTitle, sanitizedArtist)
+                    songDao.registerUserToSong(sanitizedEmail, songId)
+                    onSuccess()
                 } else {
                     var savedArtworkPath = ""
-                    // If user selected an artwork, try to save it directly
                     if (song.artworkUri.isNotEmpty()) {
-                        try {
-                            val artworkUri = Uri.parse(song.artworkUri)
-                            savedArtworkPath = saveArtworkFromUri(context, artworkUri) ?: ""
-                            Log.d("ArtworkFix", "Saved selected artwork: $savedArtworkPath")
-                        } catch (e: Exception) {
-                            Log.e("ArtworkFix", "Failed to save selected artwork: ${e.message}")
-                        }
+                        val artworkUri = Uri.parse(song.artworkUri)
+                        savedArtworkPath = saveArtworkFromUri(context, artworkUri) ?: ""
                     }
-
-                    // If no artwork saved yet, try to extract from the audio file
                     if (savedArtworkPath.isEmpty()) {
-                        try {
-                            val audioUri = Uri.parse(song.uri)
-                            savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
-                            Log.d("ArtworkFix", "Extracted audio artwork: $savedArtworkPath")
-                        } catch (e: Exception) {
-                            Log.e("ArtworkFix", "Failed to extract audio artwork: ${e.message}")
-                        }
+                        val audioUri = Uri.parse(song.uri)
+                        savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
                     }
-
                     val entity = SongEntity(
-                        title = song.title,
-                        artist = song.artist,
+                        title = sanitizedTitle,
+                        artist = sanitizedArtist,
                         duration = song.duration,
                         uri = song.uri,
                         artworkUri = savedArtworkPath
                     )
                     val newId = songDao.insertSong(entity).toInt()
-                    songDao.registerUserToSong(DataKeeper.email.toString(), newId)
+                    songDao.registerUserToSong(sanitizedEmail, newId)
+                    onSuccess()
                 }
-                onSuccess()
             }
         }
     }
 
     fun updateSongTimestamp(song: Song) {
+        if (song.id == null || !isValidEmail(DataKeeper.email ?: "")) {
+            return
+        }
         viewModelScope.launch {
-            val timestampExists = songDao.isTimestampExistsForEmail(DataKeeper.email.toString(), song.id ?: return@launch)
+            val sanitizedEmail = sanitizeText(DataKeeper.email ?: "")
+            val timestampExists = songDao.isTimestampExistsForEmail(sanitizedEmail, song.id)
             val currentTime = System.currentTimeMillis()
             val songTimestamp = SongPlayTimestamp(
-                userEmail = DataKeeper.email.toString(),
+                userEmail = sanitizedEmail,
                 songId = song.id,
                 lastPlayedTimestamp = currentTime
             )
@@ -208,14 +195,14 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val likedSongs: Flow<List<Song>> =
-        songDao.getSongsByUser(DataKeeper.email.toString()).map { entities ->
+        songDao.getSongsByUser(sanitizeText(DataKeeper.email ?: "")).map { entities ->
             entities.filter { entity ->
-                songDao.isSongLiked(DataKeeper.email.toString(), entity.id)
+                songDao.isSongLiked(sanitizeText(DataKeeper.email ?: ""), entity.id)
             }.map { entity ->
                 Song(
                     id = entity.id,
-                    title = entity.title,
-                    artist = entity.artist,
+                    title = sanitizeText(entity.title),
+                    artist = sanitizeText(entity.artist),
                     duration = entity.duration,
                     uri = entity.uri,
                     artworkUri = entity.artworkUri ?: ""
@@ -224,16 +211,17 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         }
 
     suspend fun isSongLiked(songId: Int): Boolean {
-        return songDao.isSongLiked(DataKeeper.email.toString(), songId)
+        return songDao.isSongLiked(sanitizeText(DataKeeper.email ?: ""), songId)
     }
 
-    // Toggle like status
     fun toggleSongLike(song: Song) {
+        if (song.id == null || !isValidEmail(DataKeeper.email ?: "")) {
+            return
+        }
         viewModelScope.launch {
-            if (song.id == null) return@launch
-            val isLiked = songDao.isSongLiked(DataKeeper.email.toString(), song.id)
-            val crossRef = LikedSongCrossRef(DataKeeper.email.toString(), song.id)
-
+            val sanitizedEmail = sanitizeText(DataKeeper.email ?: "")
+            val isLiked = songDao.isSongLiked(sanitizedEmail, song.id)
+            val crossRef = LikedSongCrossRef(sanitizedEmail, song.id)
             if (isLiked) {
                 songDao.unlikeSong(crossRef)
             } else {
@@ -252,57 +240,39 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             if (originalSong.id == null) return@launch
-
-            val trimmedTitle = newTitle.trim()
-            val trimmedArtist = newArtist.trim()
-
-            // Check for duplicates (excluding the current song)
+            val sanitizedTitle = sanitizeText(newTitle.trim())
+            val sanitizedArtist = sanitizeText(newArtist.trim())
             val exists = songDao.isSongExistsForUserExcludingId(
-                trimmedTitle,
-                trimmedArtist,
-                DataKeeper.email.toString(),
+                sanitizedTitle,
+                sanitizedArtist,
+                sanitizeText(DataKeeper.email ?: ""),
                 originalSong.id
             )
-
             if (exists) {
-                onExists("A song with the title '$trimmedTitle' and artist '$trimmedArtist' already exists in your library.")
+                onExists("A song with the title '$sanitizedTitle' and artist '$sanitizedArtist' already exists in your library.")
             } else {
                 val existingEntity = songDao.getSongById(originalSong.id)
                 if (existingEntity != null) {
                     var updatedArtworkUri = existingEntity.artworkUri
-
-                    if (newArtworkUri != null) {
-                        Log.d("ArtworkFix", "Processing new artwork: $newArtworkUri")
-
-                        // Delete old artwork if it exists
+                    if (newArtworkUri != null && isValidUri(newArtworkUri, appContext.contentResolver)) {
                         if (!existingEntity.artworkUri.isNullOrEmpty()) {
                             try {
                                 val oldFile = File(existingEntity.artworkUri)
                                 if (oldFile.exists()) {
                                     oldFile.delete()
-                                    Log.d("ArtworkFix", "Deleted old artwork: ${existingEntity.artworkUri}")
                                 }
                             } catch (e: Exception) {
-                                Log.e("ArtworkFix", "Error deleting old artwork: ${e.message}")
+                                // Handle silently
                             }
                         }
-
-                        // Save new artwork - using application context here
-                        try {
-                            val appContext = getApplication<Application>().applicationContext
-                            val savedPath = saveArtworkFromUri(appContext, newArtworkUri)
-                            if (savedPath != null) {
-                                updatedArtworkUri = savedPath
-                                Log.d("ArtworkFix", "Saved new artwork: $savedPath")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("ArtworkFix", "Failed to save new artwork: ${e.message}")
+                        val savedPath = saveArtworkFromUri(appContext, newArtworkUri)
+                        if (savedPath != null) {
+                            updatedArtworkUri = savedPath
                         }
                     }
-
                     val updatedEntity = existingEntity.copy(
-                        title = trimmedTitle,
-                        artist = trimmedArtist,
+                        title = sanitizedTitle,
+                        artist = sanitizedArtist,
                         artworkUri = updatedArtworkUri
                     )
                     songDao.updateSongEntity(updatedEntity)
@@ -317,42 +287,63 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
     fun deleteSong(song: Song, onDeleted: () -> Unit) {
         viewModelScope.launch {
             if (song.id == null) return@launch
-
-            val userEmail = DataKeeper.email.toString()
+            val sanitizedEmail = sanitizeText(DataKeeper.email ?: "")
             val songId = song.id
-
-            // 1. Remove the link between the user and the song
-            songDao.deleteUserSongLink(userEmail, songId)
-
-            // 2. Remove like status for this user and song (if exists)
-            songDao.deleteLikedSongLink(userEmail, songId)
-
-            // 3. Remove timestamp for this user and song (if exists)
-            songDao.deleteTimestampForUserSong(userEmail, songId)
-
-            // 4. Check if any other user is linked to this song
+            songDao.deleteUserSongLink(sanitizedEmail, songId)
+            songDao.deleteLikedSongLink(sanitizedEmail, songId)
+            songDao.deleteTimestampForUserSong(sanitizedEmail, songId)
             val remainingUsers = songDao.countUsersForSong(songId)
-
-            // 5. If no other users are linked, delete the actual song record and its artwork
             if (remainingUsers == 0) {
                 if (song.artworkUri.isNotEmpty()) {
                     try {
                         val artworkFile = File(song.artworkUri)
                         if (artworkFile.exists()) {
                             artworkFile.delete()
-                            Log.d("DeleteSong", "Deleted artwork file: ${song.artworkUri}")
                         }
                     } catch (e: Exception) {
-                        Log.e("DeleteSong", "Error deleting artwork file: ${song.artworkUri}", e)
+                        // Handle silently
                     }
                 }
                 songDao.deleteSongById(songId)
-                Log.d("DeleteSong", "Deleted song record with ID: $songId")
-            } else {
-                Log.d("DeleteSong", "Unlinked user $userEmail from song $songId. $remainingUsers users remaining.")
             }
-
             onDeleted()
         }
+    }
+
+    private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+        return try {
+            val scheme = uri.scheme
+            if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
+                return false
+            }
+            contentResolver.openInputStream(uri)?.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isValidSong(song: Song): Boolean {
+        return song.uri.isNotBlank() && song.title.isNotBlank() && song.artist.isNotBlank()
+    }
+
+    private fun isValidEmail(email: String): Boolean {
+        val emailPattern = Pattern.compile(
+            "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+        )
+        return emailPattern.matcher(email.trim()).matches()
+    }
+
+    private fun sanitizeText(text: String): String {
+        val maxLength = 100
+        val safeText = text.replace(Regex("[<>\"&]"), "")
+        return if (safeText.length > maxLength) safeText.substring(0, maxLength) else safeText
+    }
+
+    private fun sanitizeFileName(fileName: String): String {
+        val maxLength = 100
+        val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "")
+        return if (safeName.length > maxLength) safeName.substring(0, maxLength) else safeName
     }
 }

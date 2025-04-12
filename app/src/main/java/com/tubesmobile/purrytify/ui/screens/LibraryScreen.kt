@@ -27,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -86,9 +85,9 @@ fun MusicLibraryScreen(
     val isConnected by LocalNetworkStatus.current.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
     var songToEdit by remember { mutableStateOf<Song?>(null) }
-
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var songToDelete by remember { mutableStateOf<Song?>(null) }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
@@ -162,7 +161,7 @@ fun MusicLibraryScreen(
                     onClick = { musicBehaviorViewModel.setSelectedTab("Liked Songs") }
                 )
 
-                Spacer(modifier = Modifier.weight(1f)) // Dorong ke kanan
+                Spacer(modifier = Modifier.weight(1f))
 
                 IconButton(
                     onClick = { musicBehaviorViewModel.cyclePlaybackMode() },
@@ -184,7 +183,6 @@ fun MusicLibraryScreen(
                 }
             }
 
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -280,7 +278,7 @@ fun MusicLibraryScreen(
                         originalSong,
                         newTitle,
                         newArtist,
-                        newArtworkUri, // Pass the new artwork URI (can be null if unchanged)
+                        newArtworkUri,
                         onSuccess = {
                             onSuccess()
                             scope.launch { snackbarHostState.showSnackbar("Song updated successfully") }
@@ -301,16 +299,12 @@ fun MusicLibraryScreen(
                     musicDbViewModel.deleteSong(song) {
                         showDeleteConfirmDialog = false
                         songToDelete = null
-
                         scope.launch { snackbarHostState.showSnackbar("${song.title} deleted") }
-
                         if (currentSong?.id == song.id) {
-                            // If we have songs in the queue, play the next song
                             if (musicBehaviorViewModel.hasNextSong()) {
-                                musicBehaviorViewModel.playNext(context)  // Changed from playNextSong to playNext
+                                musicBehaviorViewModel.playNext(context)
                                 scope.launch { snackbarHostState.showSnackbar("Playing next song") }
                             } else {
-                                // If there are no songs in the queue, stop playback
                                 musicBehaviorViewModel.stopPlayback()
                                 scope.launch { snackbarHostState.showSnackbar("Playback stopped - song was deleted") }
                             }
@@ -349,7 +343,6 @@ fun MusicLibraryScreen(
                     )
                 },
                 onEditSong = { originalSong, newTitle, newArtist, newArtworkUri, onSuccess, onExists ->
-                    // This won't be used in add mode, but we need to provide it
                     musicDbViewModel.updateSong(
                         originalSong,
                         newTitle,
@@ -368,7 +361,6 @@ fun MusicLibraryScreen(
         }
     }
 }
-
 
 @Composable
 fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
@@ -404,27 +396,22 @@ fun SongItem(
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        if (song.artworkUri.isNotEmpty()) {
+        imageBitmap = null
+        if (song.artworkUri.isNotEmpty() && isSafeFilePath(song.artworkUri)) {
             withContext(Dispatchers.IO) {
-                try {
-                    val file = File(song.artworkUri)
-                    if (file.exists()) {
+                val file = File(song.artworkUri)
+                if (file.exists() && file.length() <= 5 * 1024 * 1024) { // Batas ukuran file 5MB
+                    try {
                         val options = BitmapFactory.Options().apply {
-                            inSampleSize = 2  // Scale down to use less memory
+                            inSampleSize = 2 // Mengurangi penggunaan memori
                         }
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
                         if (bitmap != null) {
-                            withContext(Dispatchers.Main) {
-                                imageBitmap = bitmap.asImageBitmap()
-                            }
-                        } else {
-                            Log.w("SongItem", "Failed to decode bitmap from: ${song.artworkUri}")
+                            imageBitmap = bitmap.asImageBitmap()
                         }
-                    } else {
-                        Log.w("SongItem", "Artwork file not found: ${song.artworkUri}")
+                    } catch (e: Exception) {
+                        // Logging minimal untuk produksi
                     }
-                } catch (e: Exception) {
-                    Log.e("SongItem", "Error loading artwork: ${e.message}", e)
                 }
             }
         }
@@ -437,7 +424,6 @@ fun SongItem(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Box with background to be visible while loading
         Box(
             modifier = Modifier
                 .size(56.dp)
@@ -447,14 +433,14 @@ fun SongItem(
             if (imageBitmap != null) {
                 Image(
                     bitmap = imageBitmap!!,
-                    contentDescription = "Album artwork for ${song.title}",
+                    contentDescription = "Artwork for ${song.title}",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             } else {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "No artwork",
+                    contentDescription = "No artwork for ${song.title}",
                     modifier = Modifier.size(32.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -485,7 +471,11 @@ fun SongItem(
 
         Box {
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "More Options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             DropdownMenu(
@@ -494,7 +484,7 @@ fun SongItem(
             ) {
                 DropdownMenuItem(
                     text = { Text("Add to Queue") },
-                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null)},
+                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
                     onClick = {
                         onAddToQueue(song)
                         expanded = false
@@ -502,7 +492,7 @@ fun SongItem(
                 )
                 DropdownMenuItem(
                     text = { Text("Edit") },
-                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null)},
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                     onClick = {
                         onEditRequest(song)
                         expanded = false
@@ -547,13 +537,6 @@ fun DeleteConfirmationDialog(
     )
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun MusicLibraryScreenPreview() {
-//    val navController = rememberNavController()
-//    val previewViewModel: MusicBehaviorViewModel = viewModel()
-//
-//    PurrytifyTheme {
-//        MusicLibraryScreen(navController, previewViewModel)
-//    }
-//}
+private fun isSafeFilePath(path: String): Boolean {
+    return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
+}

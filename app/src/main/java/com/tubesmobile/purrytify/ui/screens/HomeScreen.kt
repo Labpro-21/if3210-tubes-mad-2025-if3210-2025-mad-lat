@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.content.ContentResolver
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -29,7 +30,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,7 +44,6 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.SpanStyle
@@ -53,6 +52,7 @@ import androidx.compose.ui.text.withStyle
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
+import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -86,7 +86,7 @@ fun HomeScreen(
     Scaffold(
         bottomBar = {
             Column {
-                if (currentSong != null){
+                if (currentSong != null) {
                     BottomPlayerBar(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         navController = navController,
@@ -254,41 +254,51 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
         val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
         val imageBitmap = imageBitmapState.value
 
-        LaunchedEffect(song?.artworkUri) {
+        LaunchedEffect(song.artworkUri) {
             imageBitmapState.value = null
-            val retriever = MediaMetadataRetriever()
-            try {
-                if (song?.artworkUri == "Metadata") {
-                    retriever.setDataSource(context, Uri.parse(song.uri))
-                    val art = retriever.embeddedPicture
-                    if (art != null) {
-                        val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                        imageBitmapState.value = bitmap.asImageBitmap()
+            if (song.artworkUri.isNotEmpty()) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    val uri = Uri.parse(song.uri)
+                    if (!isValidUri(uri, context.contentResolver)) {
+                        return@LaunchedEffect
                     }
-                } else if (!song?.artworkUri.isNullOrEmpty()) {
-                    val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
-                    if (fileBitmap != null) {
-                        imageBitmapState.value = fileBitmap.asImageBitmap()
+
+                    if (song.artworkUri == "Metadata") {
+                        retriever.setDataSource(context, uri)
+                        val art = retriever.embeddedPicture
+                        if (art != null && art.size <= 5 * 1024 * 1024) { // batas ukuran 5mb
+                            val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                            imageBitmapState.value = bitmap?.asImageBitmap()
+                        }
+                    } else {
+                        val file = File(song.artworkUri)
+                        if (file.exists() && isSafeFilePath(file.absolutePath) && file.length() <= 5 * 1024 * 1024) {
+                            val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
+                            imageBitmapState.value = fileBitmap?.asImageBitmap()
+                        }
                     }
+                } catch (e: SecurityException) {
+                    Log.e("NewSongItem", "Security exception accessing URI", e)
+                } catch (e: Exception) {
+                    Log.e("NewSongItem", "Error loading artwork", e)
+                } finally {
+                    retriever.release()
                 }
-            } catch (_: Exception) {
-                imageBitmapState.value = null
-            } finally {
-                retriever.release()
             }
         }
-        if (imageBitmap != null){
+
+        if (imageBitmap != null) {
             Image(
-                bitmap = imageBitmap!!,
+                bitmap = imageBitmap,
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(8.dp))
             )
-        }
-        else{
+        } else {
             Image(
-                painter = painterResource(id =  R.drawable.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(50.dp)
@@ -298,7 +308,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = song.title,
-            color = if (song.id == currentSong?.id ) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground ,
+            color = if (song.id == currentSong?.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
@@ -324,41 +334,51 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
         val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
         val imageBitmap = imageBitmapState.value
 
-        LaunchedEffect(song?.artworkUri) {
+        LaunchedEffect(song.artworkUri) {
             imageBitmapState.value = null
-            val retriever = MediaMetadataRetriever()
-            try {
-                if (song?.artworkUri == "Metadata") {
-                    retriever.setDataSource(context, Uri.parse(song.uri))
-                    val art = retriever.embeddedPicture
-                    if (art != null) {
-                        val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                        imageBitmapState.value = bitmap.asImageBitmap()
+            if (song.artworkUri.isNotEmpty()) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    val uri = Uri.parse(song.uri)
+                    if (!isValidUri(uri, context.contentResolver)) {
+                        return@LaunchedEffect
                     }
-                } else if (!song?.artworkUri.isNullOrEmpty()) {
-                    val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
-                    if (fileBitmap != null) {
-                        imageBitmapState.value = fileBitmap.asImageBitmap()
+
+                    if (song.artworkUri == "Metadata") {
+                        retriever.setDataSource(context, uri)
+                        val art = retriever.embeddedPicture
+                        if (art != null && art.size <= 5 * 1024 * 1024) { // batas ukuran 5mb
+                            val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                            imageBitmapState.value = bitmap?.asImageBitmap()
+                        }
+                    } else {
+                        val file = File(song.artworkUri)
+                        if (file.exists() && isSafeFilePath(file.absolutePath) && file.length() <= 5 * 1024 * 1024) {
+                            val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
+                            imageBitmapState.value = fileBitmap?.asImageBitmap()
+                        }
                     }
+                } catch (e: SecurityException) {
+                    Log.e("RecentlyPlayedItem", "Security exception accessing URI", e)
+                } catch (e: Exception) {
+                    Log.e("RecentlyPlayedItem", "Error loading artwork", e)
+                } finally {
+                    retriever.release()
                 }
-            } catch (_: Exception) {
-                imageBitmapState.value = null
-            } finally {
-                retriever.release()
             }
         }
-        if (imageBitmap != null){
+
+        if (imageBitmap != null) {
             Image(
-                bitmap = imageBitmap!!,
+                bitmap = imageBitmap,
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(8.dp))
             )
-        }
-        else{
+        } else {
             Image(
-                painter = painterResource(id =  R.drawable.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(50.dp)
@@ -383,6 +403,24 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
     }
 }
 
+private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+    return try {
+        val scheme = uri.scheme
+        if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
+            return false
+        }
+        // cek apakah uri dapat diakses
+        contentResolver.openInputStream(uri)?.close()
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private fun isSafeFilePath(path: String): Boolean {
+    return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
+}
+
 data class Song(
     val id: Int? = null,
     val title: String,
@@ -397,14 +435,3 @@ data class SongTimestamp(
     val songId: Int,
     val lastPlayedTimestamp: Long? = null
 )
-
-//@Preview(showBackground = true)
-//@Composable
-//fun HomeScreenPreview() {
-//    val navController = rememberNavController()
-//    val previewViewModel: MusicBehaviorViewModel = viewModel()
-//
-//    PurrytifyTheme {
-//        HomeScreen(navController, previewViewModel)
-//    }
-//}

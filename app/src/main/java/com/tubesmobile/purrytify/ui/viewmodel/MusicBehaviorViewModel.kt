@@ -1,18 +1,19 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
+import android.content.ContentResolver
 import android.content.Context
-import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import com.tubesmobile.purrytify.ui.screens.Song
 import android.media.MediaPlayer
 import android.net.Uri
-import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tubesmobile.purrytify.ui.screens.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 enum class PlaybackMode {
     REPEAT,
@@ -54,12 +55,17 @@ class MusicBehaviorViewModel : ViewModel() {
     private var updateJob: Job? = null
 
     fun playSong(song: Song, context: Context) {
+        val uri = Uri.parse(song.uri)
+        if (!isValidUri(uri, context.contentResolver)) {
+            return
+        }
+
         _currentSong.value = song
         currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, Uri.parse(song.uri))
+                setDataSource(context, uri)
                 prepare()
                 setOnCompletionListener {
                     playNext(context)
@@ -69,20 +75,27 @@ class MusicBehaviorViewModel : ViewModel() {
                 _isPlaying.value = true
             }
             startUpdatingProgress()
+        } catch (e: SecurityException) {
+            // Handle silently for production
+        } catch (e: IOException) {
+            // Handle silently for production
         } catch (e: Exception) {
-            e.printStackTrace()
+            // Handle silently for production
         }
     }
 
     fun togglePlayPause() {
         mediaPlayer?.let {
-            if (it.isPlaying){
-                it.pause()
-                _isPlaying.value = false
-            }
-            else{
-                it.start()
-                _isPlaying.value = true
+            try {
+                if (it.isPlaying) {
+                    it.pause()
+                    _isPlaying.value = false
+                } else {
+                    it.start()
+                    _isPlaying.value = true
+                }
+            } catch (e: IllegalStateException) {
+                // Handle silently for production
             }
         }
     }
@@ -92,7 +105,11 @@ class MusicBehaviorViewModel : ViewModel() {
         updateJob = viewModelScope.launch {
             while (true) {
                 mediaPlayer?.let {
-                    _currentPosition.value= it.currentPosition
+                    try {
+                        _currentPosition.value = it.currentPosition
+                    } catch (e: IllegalStateException) {
+                        // Handle silently for production
+                    }
                 }
                 delay(1000)
             }
@@ -103,24 +120,28 @@ class MusicBehaviorViewModel : ViewModel() {
         _selectedTab.value = tab
     }
 
-
     fun seekTo(position: Int) {
-        mediaPlayer?.seekTo(position)
-        _currentPosition.value = position
+        mediaPlayer?.let {
+            val validPosition = position.coerceIn(0, it.duration)
+            try {
+                it.seekTo(validPosition)
+                _currentPosition.value = validPosition
+            } catch (e: IllegalStateException) {
+                // Handle silently for production
+            }
+        }
     }
 
     fun setPlaylist(songs: List<Song>) {
         _playlist.clear()
-        _playlist.addAll(songs)
+        _playlist.addAll(songs.filter { isValidSong(it) })
     }
 
     fun playNext(context: Context) {
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
-            Log.d("QUEUE_DEBUG", "Playing from queue: ${nextFromQueue.title}")
             playSong(nextFromQueue, context)
         } else {
-            Log.d("QUEUE_DEBUG", "Queue is empty, playing from playlist")
             playNextFromPlaylist(context)
         }
     }
@@ -132,23 +153,20 @@ class MusicBehaviorViewModel : ViewModel() {
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
                 _currentSong.value?.let {
-                    Log.d("QUEUE_DEBUG", "REPEAT_ONE: Replaying ${it.title}")
                     playSong(it, context)
                 }
             }
 
             PlaybackMode.SHUFFLE -> {
-                if (list.size > 1) {
-                    val newIndex = (list.indices - currentIndex).random()
-                    currentIndex = newIndex
+                val indices = list.indices - currentIndex
+                if (indices.isNotEmpty()) {
+                    currentIndex = indices.random()
+                    playSong(list[currentIndex], context)
                 }
-                Log.d("QUEUE_DEBUG", "SHUFFLE: Playing ${list[currentIndex].title}")
-                playSong(list[currentIndex], context)
             }
 
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
-                Log.d("QUEUE_DEBUG", "REPEAT: Playing ${list[currentIndex].title}")
                 playSong(list[currentIndex], context)
             }
         }
@@ -166,11 +184,11 @@ class MusicBehaviorViewModel : ViewModel() {
             }
 
             PlaybackMode.SHUFFLE -> {
-                if (list.size > 1) {
-                    val newIndex = (list.indices - currentIndex).random()
-                    currentIndex = newIndex
+                val indices = list.indices - currentIndex
+                if (indices.isNotEmpty()) {
+                    currentIndex = indices.random()
+                    playSong(list[currentIndex], context)
                 }
-                playSong(list[currentIndex], context)
             }
 
             PlaybackMode.REPEAT -> {
@@ -189,16 +207,27 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun addToQueue(song: Song) {
-        _queue.add(song)
-        Log.d("QUEUE_DEBUG", "Added to queue: ${song.title}, new queue size: ${_queue.size}")
+        if (isValidSong(song)) {
+            _queue.add(song)
+        }
     }
 
     fun playNextFromQueue(context: Context) {
-        playNext(context) // This already handles queue priority correctly
+        if (_queue.isNotEmpty()) {
+            val nextSong = _queue.removeAt(0)
+            playSong(nextSong, context)
+        } else {
+            playNext(context)
+        }
     }
 
     fun playOrQueueNext(context: Context) {
-        playNext(context) // This already handles queue priority correctly
+        if (_queue.isNotEmpty()) {
+            val nextSong = _queue.removeAt(0)
+            playSong(nextSong, context)
+        } else {
+            playNext(context)
+        }
     }
 
     fun stopPlayback() {
@@ -208,7 +237,6 @@ class MusicBehaviorViewModel : ViewModel() {
             }
             reset()
         }
-
         _isPlaying.value = false
     }
 
@@ -216,34 +244,43 @@ class MusicBehaviorViewModel : ViewModel() {
         if (_queue.isNotEmpty()) {
             return true
         }
-
-        // If no songs in queue, check if there are more songs in the playlist
         if (_playlist.isEmpty()) {
             return false
         }
-
-        // If in REPEAT mode, there's always a next song as long as playlist has songs
-        if (_playbackMode.value == PlaybackMode.REPEAT) {
-            return _playlist.size > 1
+        return when (_playbackMode.value) {
+            PlaybackMode.REPEAT -> true
+            PlaybackMode.SHUFFLE -> _playlist.size > 1
+            PlaybackMode.REPEAT_ONE -> _playlist.size > 1
         }
-
-        // If in SHUFFLE mode, there's a next song if playlist has more than one song
-        if (_playbackMode.value == PlaybackMode.SHUFFLE) {
-            return _playlist.size > 1
-        }
-
-        // If in REPEAT_ONE mode, there's technically no "next" song (it just repeats current)
-        // But we'll return true if there are other songs in the playlist
-        if (_playbackMode.value == PlaybackMode.REPEAT_ONE) {
-            return _playlist.size > 1
-        }
-
-        // If current index is valid and not at the end of playlist
-        return currentIndex >= 0 && currentIndex < _playlist.size - 1
     }
 
     override fun onCleared() {
         super.onCleared()
         mediaPlayer?.release()
+        mediaPlayer = null
+        updateJob?.cancel()
+        _currentSong.value = null
+        _playlist.clear()
+        _queue.clear()
+        _currentPosition.value = 0
+        _duration.value = 0
+        _isPlaying.value = false
+    }
+
+    private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+        return try {
+            val scheme = uri.scheme
+            if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
+                return false
+            }
+            contentResolver.openInputStream(uri)?.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isValidSong(song: Song): Boolean {
+        return song.uri.isNotBlank() && song.title.isNotBlank() && song.artist.isNotBlank()
     }
 }

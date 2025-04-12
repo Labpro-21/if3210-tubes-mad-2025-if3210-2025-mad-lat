@@ -2,6 +2,7 @@ package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.api.RetrofitClient
@@ -12,6 +13,7 @@ import com.tubesmobile.purrytify.service.TokenVerificationService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.regex.Pattern
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: UserRepository
@@ -27,38 +29,72 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun loadProfile() {
         _profile.value = ProfileState.Loading
 
-        android.util.Log.d("ProfileViewModel", "Loading profile...")
-
         viewModelScope.launch {
-            val result = repository.getProfile()
-            if (result.isSuccess) {
-                android.util.Log.d("ProfileViewModel", "Profile loaded successfully")
-                _profile.value = ProfileState.Success(result.getOrNull()!!)
-            } else {
-                val error = result.exceptionOrNull()?.message ?: "Unknown error"
-                android.util.Log.e("ProfileViewModel", "Error loading profile: $error")
-
-                if (error.contains("Token expired")) {
-                    _profile.value = ProfileState.SessionExpired
+            try {
+                val result = repository.getProfile()
+                if (result.isSuccess) {
+                    val profileData = result.getOrNull()
+                    if (profileData != null && isValidProfile(profileData)) {
+                        _profile.value = ProfileState.Success(profileData)
+                    } else {
+                        _profile.value = ProfileState.Error("Invalid profile data")
+                    }
                 } else {
-                    _profile.value = ProfileState.Error(error)
+                    val errorMessage = sanitizeText(
+                        result.exceptionOrNull()?.message ?: "Unknown error"
+                    )
+                    _profile.value = when {
+                        errorMessage.contains("token expired", ignoreCase = true) -> {
+                            ProfileState.SessionExpired
+                        }
+                        else -> ProfileState.Error(errorMessage)
+                    }
                 }
+            } catch (e: Exception) {
+                _profile.value = ProfileState.Error("Failed to connect to server")
             }
         }
     }
 
     fun logout() {
         repository.logout()
+        Log.d("logout", "disini masuk")
 
-        // Stop the token verification service
-        val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
-        getApplication<Application>().stopService(serviceIntent)
+        try {
+            Log.d("logout", "disini dah pasti masuk")
+            val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
+            Log.d("logout", "belum tentu")
+            getApplication<Application>().stopService(serviceIntent)
+            Log.d("logout", "alhamdulillah")
+        } catch (e: Exception) {
+            Log.e("Logout Error", e.message.toString())
+        }
+    }
+
+    private fun isValidProfile(profile: ProfileResponse): Boolean {
+        return profile.email.isNotBlank() && isValidEmail(profile.email) &&
+                profile.username.isNotBlank() &&
+                profile.location.isNotBlank()
+    }
+
+    private fun isValidEmail(email: String): Boolean {
+        val emailPattern = Pattern.compile(
+            "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+        )
+        return emailPattern.matcher(email.trim()).matches()
+    }
+
+    private fun sanitizeText(text: String): String {
+        val maxLength = 100
+        val safeText = text.replace(Regex("[<>\"&]"), "")
+        return if (safeText.length > maxLength) safeText.substring(0, maxLength) else safeText
     }
 
     sealed class ProfileState {
         object Loading : ProfileState()
         data class Success(val profile: ProfileResponse) : ProfileState()
         data class Error(val message: String) : ProfileState()
-        object SessionExpired : ProfileState() // New state for expired session
+        object SessionExpired : ProfileState()
     }
 }

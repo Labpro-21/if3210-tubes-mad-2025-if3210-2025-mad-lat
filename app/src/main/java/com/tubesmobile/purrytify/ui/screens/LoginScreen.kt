@@ -25,16 +25,11 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.WifiOff
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.TextRange
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.util.PatternsCompat
+import androidx.compose.ui.text.input.TextFieldValue
+import java.util.regex.Pattern
 
 @Composable
 fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel = viewModel()) {
@@ -46,7 +41,7 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
     var errorMessage by remember { mutableStateOf("") }
     val isConnected by LocalNetworkStatus.current.collectAsState()
 
-    val isEmailValid = email.text.matches(Regex(PatternsCompat.EMAIL_ADDRESS.pattern()))
+    val isEmailValid = isValidEmail(email.text)
     val isPasswordValid = password.text.length >= 8
     val maxEmailLength = 100
     val maxPasswordLength = 50
@@ -61,8 +56,9 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                 }
             }
             is LoginViewModel.LoginState.Error -> {
-                errorMessage = (loginState as LoginViewModel.LoginState.Error).message
-                    .replace(Regex("[<>{}]"), "")
+                errorMessage = sanitizeErrorMessage(
+                    (loginState as LoginViewModel.LoginState.Error).message
+                )
                 showError = true
                 kotlinx.coroutines.delay(5000)
                 showError = false
@@ -80,7 +76,7 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
         ) {
             Image(
                 painter = painterResource(id = R.drawable.bg),
-                contentDescription = null,
+                contentDescription = "Album covers",
                 modifier = Modifier
                     .size(410.dp)
                     .align(Alignment.TopEnd),
@@ -232,11 +228,11 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                 // LOGIN BUTTON
                 Button(
                     onClick = {
-                        if (isEmailValid && isPasswordValid) {
-                            loginViewModel.login(email.text, password.text)
+                        if (isEmailValid && isPasswordValid && isConnected) {
+                            loginViewModel.login(email.text.trim(), password.text)
                         } else {
                             showError = true
-                            errorMessage = "Please correct the input errors"
+                            errorMessage = sanitizeErrorMessage("Please correct the input errors or check your network")
                         }
                     },
                     modifier = Modifier
@@ -275,4 +271,18 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
             }
         }
     }
+}
+
+private fun isValidEmail(email: String): Boolean {
+    val emailPattern = Pattern.compile(
+        "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+        Pattern.CASE_INSENSITIVE
+    )
+    return emailPattern.matcher(email.trim()).matches()
+}
+
+private fun sanitizeErrorMessage(message: String): String {
+    val maxLength = 100
+    val safeMessage = message.replace(Regex("[<>\"&]"), "")
+    return if (safeMessage.length > maxLength) safeMessage.substring(0, maxLength) else safeMessage
 }
