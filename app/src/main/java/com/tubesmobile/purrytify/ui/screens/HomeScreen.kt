@@ -47,11 +47,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel, loginViewModel: LoginViewModel) {
-    loginViewModel.userEmail.collectAsState()
+fun HomeScreen(
+    navController: NavHostController,
+    musicBehaviorViewModel: MusicBehaviorViewModel,
+    loginViewModel: LoginViewModel
+) {
+    val userName by loginViewModel.userName.collectAsState()
+
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -105,6 +113,42 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = buildAnnotatedString {
+                            append("Welcome,\n")
+                            if (!userName.isNullOrEmpty()) {
+                                withStyle(style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )) {
+                                    append(userName)
+                                }
+                            }
+                        },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 36.sp
+                    )
+                }
+
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Purrytify Logo",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .padding(start = 16.dp)
+                )
+            }
+
             Text(
                 text = "New songs",
                 color = MaterialTheme.colorScheme.onBackground,

@@ -27,6 +27,8 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     // State baru untuk menyimpan email pengguna
     private val _userEmail = MutableStateFlow<String?>(null)
     val userEmail: StateFlow<String?> = _userEmail
+    private val _userName = MutableStateFlow<String?>(null)
+    val userName: StateFlow<String?> = _userName
 
     fun login(email: String, password: String) {
         _loginState.value = LoginState.Loading
@@ -55,14 +57,25 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchUserEmail() {
         viewModelScope.launch {
             val result = repository.getProfile()
+            val profile = result.getOrNull()
+
             _userEmail.value = if (result.isSuccess) {
-                result.getOrNull()?.email // Ambil field email dari ProfileResponse
+                profile?.email
             } else {
                 null
             }
-            DataKeeper.email = result.getOrNull()?.email
+
+            _userName.value = if (result.isSuccess) {
+                profile?.username
+            } else {
+                null
+            }
+
+            DataKeeper.email = profile?.email
+            DataKeeper.username = profile?.username
         }
     }
+
 
     sealed class LoginState {
         object Idle : LoginState()
