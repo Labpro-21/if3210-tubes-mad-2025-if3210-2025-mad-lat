@@ -249,6 +249,7 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                     shape = RoundedCornerShape(24.dp),
                     enabled = (email.text.isNotBlank() && password.text.isNotBlank() &&
                             loginState !is LoginViewModel.LoginState.Loading &&
+                            isEmailValid && isPasswordValid &&
                             isConnected)
                 ) {
                     if (loginState is LoginViewModel.LoginState.Loading) {
