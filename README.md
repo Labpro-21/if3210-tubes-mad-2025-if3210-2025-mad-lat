@@ -1,5 +1,15 @@
 # Tugas Besar 1 - Android IF3210 Pengembangan Aplikasi Piranti Bergerak
 
+## ✨ Daftar Isi
+
+- [Deskripsi Aplikasi Web](#-deskripsi-aplikasi-web)
+- [Cara Menjalankan Aplikasi](#-cara-menjalankan-aplikasi)
+- [Daftar Library](#-daftar-library)
+- [Screenshot Aplikasi](#-screenshot-aplikasi)
+- [Pembagian Kerja Kelompok](#-pembagian-kerja-kelompok)
+- [Pengerjaan Bonus](#-pengerjaan-bonus)
+- [Total Jam Persiapan dan Pengerjaan](#-total-jam-persiapan-dan-pengerjaan)
+
 ## ✨ Deskripsi Aplikasi Web
 
 Aplikasi ini adalah Purrytify, yaitu aplikasi pemutar lagu yang diupload oleh pengguna. Aplikasi ini bisa _keep track_ lagu yang diupload oleh pengguna yang berbeda dengan menggunakan email login pengguna. Selain itu juga, pengguna bisa menggunakan fitur pendukung yang biasanya ada di aplikasi pemutar lagu seperti _like_, _queue_, _shuffle_ dan _repeat_.
@@ -63,14 +73,14 @@ Install `app.apk`
 
 ## ✨ Screenshot Aplikasi
 
-![home](./screenshots/home.jpg)
-![library_all](./screenshots/library_all.jpg)
-![library_liked](./screenshots/library_liked.jpg)
-![profile](./screenshots/profile.jpg)
-![upload_song](./screenshots/upload_song.jpg)
-![music_screen](./screenshots/music_screen.jpg)
-![edit_song](./screenshots/edit_song.jpg)
-![delete_song_popup](./screenshots/delete_song_popup.jpg)
+<img src="./screenshots/home.jpg" width="300">
+<img src="./screenshots/library_all.jpg" width="300">
+<img src="./screenshots/library_liked.jpg" width="300">
+<img src="./screenshots/profile.jpg" width="300">
+<img src="./screenshots/upload_song.jpg" width="300">
+<img src="./screenshots/music_screen.jpg" width="300">
+<img src="./screenshots/edit_song.jpg" width="300">
+<img src="./screenshots/delete_song_popup.jpg" width="300">
 
 ## ✨ Pembagian Kerja Kelompok
 
@@ -94,3 +104,11 @@ Install `app.apk`
 - Repeat: [13522126](https://github.com/rizqikapratamaa)
 - [OWASP](OWASP.md): [13522147](https://github.com/Nerggg)
 - Pencarian: [13522147](https://github.com/Nerggg)
+
+## ✨ Total Jam Persiapan dan Pengerjaan
+
+| Kontributor                                    | Total Jam |
+| ---------------------------------------------- | --------- |
+| [13522126](https://github.com/rizqikapratamaa) | 23        |
+| [13522147](https://github.com/Nerggg)          | 23        |
+| [13522161](https://github.com/akmalrmn)        | 23        |
