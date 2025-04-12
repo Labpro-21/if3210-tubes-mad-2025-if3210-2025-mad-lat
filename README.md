@@ -71,12 +71,12 @@ nantian
 | ------------------ | ------------------------------------- |
 | Setup Projek Awal  | [13522147](https://github.com/Nerggg) |
 | Login              | [13522161](https://github.com/akmalrmn) [13522147](https://github.com/Nerggg) |
-| Home               | [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
-| Library            | [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
-| Pemutaran Lagu     |                                       |
-| Penambahan Lagu    |                                       [13522161](https://github.com/akmalrmn)|
+| Home               | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
+| Library            | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
+| Pemutaran Lagu     | [13522126](https://github.com/rizqikapratamaa)|
+| Penambahan Lagu    | [13522126](https://github.com/rizqikapratamaa) [13522161](https://github.com/akmalrmn)|
 | Profile            | [13522161](https://github.com/akmalrmn) [13522147](https://github.com/Nerggg) |
-| Liked Songs        |                                       |
+| Liked Songs        | [13522126](https://github.com/rizqikapratamaa)|
 | Background Service | [13522161](https://github.com/akmalrmn) |
 | Network Sensing    | [13522161](https://github.com/akmalrmn) |
 
