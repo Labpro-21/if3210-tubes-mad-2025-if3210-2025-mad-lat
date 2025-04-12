@@ -47,11 +47,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBehaviorViewModel, loginViewModel: LoginViewModel) {
-    loginViewModel.userEmail.collectAsState()
+fun HomeScreen(
+    navController: NavHostController,
+    musicBehaviorViewModel: MusicBehaviorViewModel,
+    loginViewModel: LoginViewModel
+) {
+    val userName by loginViewModel.userName.collectAsState()
+    val isConnected by LocalNetworkStatus.current.collectAsState()
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -105,10 +115,46 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = buildAnnotatedString {
+                            append("Welcome,\n")
+                            if (!userName.isNullOrEmpty()) {
+                                withStyle(style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )) {
+                                    append(userName)
+                                }
+                            }
+                        },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 36.sp
+                    )
+                }
+
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Purrytify Logo",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .padding(start = 16.dp)
+                )
+            }
+
             Text(
                 text = "New songs",
                 color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 20.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -117,7 +163,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -149,7 +195,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
             Text(
                 text = "Recently played",
                 color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 20.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -158,7 +204,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -176,15 +222,20 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                     items(recentlyPlayedSongs) { song ->
                         RecentlyPlayedItem(
                             song = song,
-                            onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                            onClick = {selectedSong ->
+                                if (selectedSong.uri != currentSong?.uri) {
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}")
+                            }
+                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                                navController.navigate("music/${Screen.LIBRARY.name}")
                             },
                             musicBehaviorViewModel = musicBehaviorViewModel
                         )
                     }
                 }
+            }
+            if (!isConnected) {
+                NetworkOfflineScreen(24)
             }
         }
     }
@@ -195,7 +246,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     Column(
         modifier = Modifier
-            .width(120.dp)
+            .width(80.dp)
             .clickable { onClick(song) },
         horizontalAlignment = Alignment.Start
     ) {

@@ -68,4 +68,25 @@ interface SongDao {
 
     @Update
     suspend fun updateTimestamp(timestamp: SongPlayTimestamp)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM songs AS s JOIN song_uploader AS su WHERE s.title = :title AND s.artist = :artist AND su.uploaderEmail = :userEmail AND s.id = su.songId AND s.id != :excludeSongId)") // Added excludeSongId
+    suspend fun isSongExistsForUserExcludingId(title: String, artist: String, userEmail: String, excludeSongId: Int): Boolean // New function for edit check
+
+    @Update
+    suspend fun updateSongEntity(song: SongEntity) // For updating song details
+
+    @Query("DELETE FROM song_uploader WHERE uploaderEmail = :userEmail AND songId = :songId")
+    suspend fun deleteUserSongLink(userEmail: String, songId: Int)
+
+    @Query("DELETE FROM liked_songs WHERE userEmail = :userEmail AND songId = :songId")
+    suspend fun deleteLikedSongLink(userEmail: String, songId: Int)
+
+    @Query("DELETE FROM songs_timestamp WHERE userEmail = :userEmail AND songId = :songId")
+    suspend fun deleteTimestampForUserSong(userEmail: String, songId: Int)
+
+    @Query("SELECT COUNT(*) FROM song_uploader WHERE songId = :songId")
+    suspend fun countUsersForSong(songId: Int): Int // Check how many users have this song
+
+    @Query("DELETE FROM songs WHERE id = :songId")
+    suspend fun deleteSongById(songId: Int) // Delete the actual song if no users are left
 }
