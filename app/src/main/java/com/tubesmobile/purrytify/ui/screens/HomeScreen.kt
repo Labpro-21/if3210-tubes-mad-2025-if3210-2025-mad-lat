@@ -352,8 +352,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
                 bitmap = imageBitmap!!,
                 contentDescription = song.title,
                 modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(60.dp)
             )
         }
         else{
@@ -361,8 +360,9 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
                 painter = painterResource(id =  R.drawable.ic_launcher_foreground),
                 contentDescription = song.title,
                 modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(60.dp)
+                    .background(MaterialTheme.colorScheme.surface),
+
             )
         }
 
@@ -371,7 +371,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
             Text(
                 text = song.title,
                 color = if (song.id == currentSong?.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Medium
             )
             Text(

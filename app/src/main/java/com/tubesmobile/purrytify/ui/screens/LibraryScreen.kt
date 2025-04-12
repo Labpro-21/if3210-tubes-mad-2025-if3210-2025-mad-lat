@@ -455,8 +455,9 @@ fun SongItem(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_launcher_foreground),
                     contentDescription = "No artwork",
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier
+                        .size(60.dp)
+                        .background(MaterialTheme.colorScheme.surface),
                 )
             }
         }
@@ -469,7 +470,7 @@ fun SongItem(
             Text(
                 text = song.title,
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
