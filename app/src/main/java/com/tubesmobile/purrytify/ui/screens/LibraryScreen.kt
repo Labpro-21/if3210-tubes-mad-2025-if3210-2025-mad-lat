@@ -12,7 +12,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,10 +39,15 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,6 +57,9 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.PlaybackMode
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,8 +79,16 @@ fun MusicLibraryScreen(
     var selectedTab by remember { mutableStateOf("All Songs") }
     var searchQuery by remember { mutableStateOf("") }
     val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
+    var showEditDialog by remember { mutableStateOf(false) }
+    var songToEdit by remember { mutableStateOf<Song?>(null) }
+
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var songToDelete by remember { mutableStateOf<Song?>(null) }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             Column {
                 if (currentSong != null) {
@@ -217,7 +239,7 @@ fun MusicLibraryScreen(
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    items(filteredSongs) { song ->
+                    items(filteredSongs, key = { it.id ?: it.uri }) { song ->
                         SongItem(
                             song = song,
                             isPlaying = song.uri == currentSong?.uri,
@@ -229,12 +251,68 @@ fun MusicLibraryScreen(
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             },
-                            onAddToQueue = { musicBehaviorViewModel.addToQueue(it) }
-
+                            onAddToQueue = { musicBehaviorViewModel.addToQueue(it) },
+                            onEditRequest = {
+                                songToEdit = it
+                                showEditDialog = true
+                            },
+                            onDeleteRequest = {
+                                songToDelete = it
+                                showDeleteConfirmDialog = true
+                            }
                         )
                     }
                 }
             }
+        }
+
+        if (showEditDialog && songToEdit != null) {
+            SwipeableUpload(
+                onDismiss = { showEditDialog = false; songToEdit = null },
+                existingSong = songToEdit,
+                onEditSong = { originalSong, newTitle, newArtist, newArtworkUri, onSuccess, onExists ->
+                    musicDbViewModel.updateSong(
+                        originalSong,
+                        newTitle,
+                        newArtist,
+                        newArtworkUri, // Pass the new artwork URI (can be null if unchanged)
+                        onSuccess = {
+                            onSuccess()
+                            scope.launch { snackbarHostState.showSnackbar("Song updated successfully") }
+                        },
+                        onExists = { errorMessage ->
+                            onExists(errorMessage)
+                        }
+                    )
+                }
+            )
+        }
+
+        if (showDeleteConfirmDialog && songToDelete != null) {
+            DeleteConfirmationDialog(
+                song = songToDelete!!,
+                onDismiss = { showDeleteConfirmDialog = false; songToDelete = null },
+                onConfirm = { song ->
+                    musicDbViewModel.deleteSong(song) {
+                        showDeleteConfirmDialog = false
+                        songToDelete = null
+
+                        scope.launch { snackbarHostState.showSnackbar("${song.title} deleted") }
+
+                        if (currentSong?.id == song.id) {
+                            // If we have songs in the queue, play the next song
+                            if (musicBehaviorViewModel.hasNextSong()) {
+                                musicBehaviorViewModel.playNext(context)  // Changed from playNextSong to playNext
+                                scope.launch { snackbarHostState.showSnackbar("Playing next song") }
+                            } else {
+                                // If there are no songs in the queue, stop playback
+                                musicBehaviorViewModel.stopPlayback()
+                                scope.launch { snackbarHostState.showSnackbar("Playback stopped - song was deleted") }
+                            }
+                        }
+                    }
+                }
+            )
         }
         if (showPopup) {
             Box(
@@ -251,13 +329,34 @@ fun MusicLibraryScreen(
 
             SwipeableUpload(
                 onDismiss = { showPopup = false },
-                onAddSong = { song, onExists ->
+                onAddSong = { newSong, onExists ->
                     musicDbViewModel.checkAndInsertSong(
                         context,
-                        song,
-                        onExists
+                        newSong,
+                        onSuccess = {
+                            showPopup = false
+                            scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
+                        },
+                        onExists = {
+                            onExists()
+                        }
                     )
-                    showPopup = false
+                },
+                onEditSong = { originalSong, newTitle, newArtist, newArtworkUri, onSuccess, onExists ->
+                    // This won't be used in add mode, but we need to provide it
+                    musicDbViewModel.updateSong(
+                        originalSong,
+                        newTitle,
+                        newArtist,
+                        newArtworkUri,
+                        onSuccess = {
+                            onSuccess()
+                            scope.launch { snackbarHostState.showSnackbar("Song updated successfully") }
+                        },
+                        onExists = { errorMessage ->
+                            onExists(errorMessage)
+                        }
+                    )
                 }
             )
         }
@@ -286,18 +385,39 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQueue: (Song) -> Unit) {
+fun SongItem(
+    song: Song,
+    isPlaying: Boolean,
+    onClick: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit,
+    onEditRequest: (Song) -> Unit,
+    onDeleteRequest: (Song) -> Unit
+) {
     val context = LocalContext.current
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        val file = File(song.artworkUri)
-        if (file.exists()) {
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            imageBitmap = bitmap?.asImageBitmap()
+        imageBitmap = null
+        withContext(Dispatchers.IO) {
+            if (song.artworkUri.isNotEmpty()) {
+                val file = File(song.artworkUri)
+                if (file.exists()) {
+                    try {
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        withContext(Dispatchers.Main) {
+                            imageBitmap = bitmap?.asImageBitmap()
+                        }
+                    } catch (e: Exception) {
+                        Log.e("SongItemArtwork", "Error loading artwork: ${song.artworkUri}", e)
+                    }
+                } else {
+                    Log.w("SongItemArtwork", "Artwork file not found: ${song.artworkUri}")
+                }
+            }
         }
     }
+
 
     Row(
         modifier = Modifier
@@ -306,30 +426,27 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        when {
-            imageBitmap != null -> {
-                Image(
-                    bitmap = imageBitmap!!,
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-
-            song.artworkUri.isEmpty() -> {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-
-            else -> {
-                val resId = song.artworkUri.toIntOrNull() ?: R.drawable.ic_launcher_foreground
-                Image(
-                    painter = painterResource(id = resId),
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
+        Box(
+            modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.surfaceVariant), // Placeholder bg
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                imageBitmap != null -> {
+                    Image(
+                        bitmap = imageBitmap!!,
+                        contentDescription = song.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                else -> {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground), // Example placeholder icon
+                        contentDescription = "No artwork",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -348,14 +465,16 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
             )
             Text(
                 text = song.artist,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), // Slightly muted
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
         Box {
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More Options")
+                Icon(Icons.Default.MoreVert, contentDescription = "More Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             DropdownMenu(
@@ -364,8 +483,25 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
             ) {
                 DropdownMenuItem(
                     text = { Text("Add to Queue") },
+                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null)},
                     onClick = {
                         onAddToQueue(song)
+                        expanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null)},
+                    onClick = {
+                        onEditRequest(song) // Call the edit callback
+                        expanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
+                    onClick = {
+                        onDeleteRequest(song) // Call the delete callback
                         expanded = false
                     }
                 )
@@ -374,6 +510,31 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
     }
 }
 
+@Composable
+fun DeleteConfirmationDialog(
+    song: Song,
+    onDismiss: () -> Unit,
+    onConfirm: (Song) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Song") },
+        text = { Text("Are you sure you want to delete '${song.title}' by ${song.artist}? This action cannot be undone.") },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(song) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Delete", color = MaterialTheme.colorScheme.onError)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
 
 //@Preview(showBackground = true)
 //@Composable

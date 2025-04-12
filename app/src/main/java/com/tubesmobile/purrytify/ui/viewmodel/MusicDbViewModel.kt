@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -84,35 +85,36 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
     fun checkAndInsertSong(
         context: Context,
         song: Song,
+        onSuccess: () -> Unit,
         onExists: () -> Unit
     ) {
         viewModelScope.launch {
-            val existsForUser = songDao.isSongExistsForUser(song.title, song.artist,
-                DataKeeper.email.toString()
-            )
+            val existsForUser = songDao.isSongExistsForUser(song.title, song.artist, DataKeeper.email.toString())
             val exists = songDao.isSongExists(song.title, song.artist)
 
             if (existsForUser) {
                 onExists()
-            } else if (exists) {
-                val songId = songDao.getSongId(song.title, song.artist)
-                val registerUploader = SongUploader(
-                    uploaderEmail = DataKeeper.email.toString(),
-                    songId = songId
-                )
-                songDao.registerUserToSong(registerUploader.uploaderEmail, registerUploader.songId)
             } else {
-                val savedArtworkPath = extractAndSaveArtwork(context, Uri.parse(song.uri)) ?: ""
-
-                val entity = SongEntity(
-                    title = song.title,
-                    artist = song.artist,
-                    duration = song.duration,
-                    uri = song.uri,
-                    artworkUri = savedArtworkPath
-                )
-                val newId = songDao.insertSong(entity).toInt()
-                songDao.registerUserToSong(DataKeeper.email.toString(), newId)
+                if (exists) {
+                    val songId = songDao.getSongId(song.title, song.artist)
+                    val registerUploader = SongUploader(
+                        uploaderEmail = DataKeeper.email.toString(),
+                        songId = songId
+                    )
+                    songDao.registerUserToSong(registerUploader.uploaderEmail, registerUploader.songId)
+                } else {
+                    val savedArtworkPath = extractAndSaveArtwork(context, Uri.parse(song.uri)) ?: ""
+                    val entity = SongEntity(
+                        title = song.title,
+                        artist = song.artist,
+                        duration = song.duration,
+                        uri = song.uri,
+                        artworkUri = savedArtworkPath
+                    )
+                    val newId = songDao.insertSong(entity).toInt()
+                    songDao.registerUserToSong(DataKeeper.email.toString(), newId)
+                }
+                onSuccess()
             }
         }
     }
@@ -166,6 +168,102 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 songDao.likeSong(crossRef)
             }
+        }
+    }
+    fun updateSong(
+        originalSong: Song,
+        newTitle: String,
+        newArtist: String,
+        newArtworkUri: Uri?,
+        onSuccess: () -> Unit,
+        onExists: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            if (originalSong.id == null) return@launch
+
+            val trimmedTitle = newTitle.trim()
+            val trimmedArtist = newArtist.trim()
+
+            // Check for duplicates (excluding the current song)
+            val exists = songDao.isSongExistsForUserExcludingId(
+                trimmedTitle,
+                trimmedArtist,
+                DataKeeper.email.toString(),
+                originalSong.id
+            )
+
+            if (exists) {
+                onExists("A song with the title '$trimmedTitle' and artist '$trimmedArtist' already exists in your library.")
+            } else {
+                val existingEntity = songDao.getSongById(originalSong.id)
+                if (existingEntity != null) {
+                    var updatedArtworkUri = existingEntity.artworkUri
+                    if (newArtworkUri != null) {
+                        val savedArtworkPath = extractAndSaveArtwork(
+                            getApplication<Application>().applicationContext,
+                            newArtworkUri
+                        )
+                        if (savedArtworkPath != null) {
+                            if (existingEntity.artworkUri?.isNotEmpty() == true) {
+                                val oldFile = File(existingEntity.artworkUri)
+                                if (oldFile.exists()) oldFile.delete()
+                            }
+                            updatedArtworkUri = savedArtworkPath
+                        }
+                    }
+                    val updatedEntity = existingEntity.copy(
+                        title = trimmedTitle,
+                        artist = trimmedArtist,
+                        artworkUri = updatedArtworkUri
+                    )
+                    songDao.updateSongEntity(updatedEntity)
+                    onSuccess()
+                } else {
+                    onExists("Error: Could not find the song to update.")
+                }
+            }
+        }
+    }
+
+    fun deleteSong(song: Song, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            if (song.id == null) return@launch
+
+            val userEmail = DataKeeper.email.toString()
+            val songId = song.id
+
+            // 1. Remove the link between the user and the song
+            songDao.deleteUserSongLink(userEmail, songId)
+
+            // 2. Remove like status for this user and song (if exists)
+            songDao.deleteLikedSongLink(userEmail, songId)
+
+            // 3. Remove timestamp for this user and song (if exists)
+            songDao.deleteTimestampForUserSong(userEmail, songId)
+
+            // 4. Check if any other user is linked to this song
+            val remainingUsers = songDao.countUsersForSong(songId)
+
+            // 5. If no other users are linked, delete the actual song record and its artwork
+            if (remainingUsers == 0) {
+                if (song.artworkUri.isNotEmpty()) {
+                    try {
+                        val artworkFile = File(song.artworkUri)
+                        if (artworkFile.exists()) {
+                            artworkFile.delete()
+                            Log.d("DeleteSong", "Deleted artwork file: ${song.artworkUri}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DeleteSong", "Error deleting artwork file: ${song.artworkUri}", e)
+                    }
+                }
+                songDao.deleteSongById(songId)
+                Log.d("DeleteSong", "Deleted song record with ID: $songId")
+            } else {
+                Log.d("DeleteSong", "Unlinked user $userEmail from song $songId. $remainingUsers users remaining.")
+            }
+
+            onDeleted()
         }
     }
 }
