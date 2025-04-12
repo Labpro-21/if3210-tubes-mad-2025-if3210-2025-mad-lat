@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.data.repository
 
+import android.util.Log
 import com.tubesmobile.purrytify.data.api.ApiService
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.data.model.*
@@ -32,6 +33,7 @@ class UserRepository(
             val response = apiService.getProfile("Bearer $token")
             if (response.isSuccessful) {
                 response.body()?.let {
+                    Log.d("UserRepository", "getProfilesuccess")
                     return Result.success(it)
                 }
                 return Result.failure(Exception("Empty response"))

@@ -136,7 +136,6 @@ fun PurrytifyNavHost(
 ) {
     val navController = rememberNavController()
 
-    // Add this line to handle token expiration within the composable hierarchy
     TokenExpirationHandler(navController)
 
     NavHost(

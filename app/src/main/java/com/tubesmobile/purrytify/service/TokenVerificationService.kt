@@ -19,7 +19,7 @@ class TokenVerificationService : Service() {
     private lateinit var tokenManager: TokenManager
 
     // Check interval - 30 seconds
-    private val CHECK_INTERVAL_MS = 30000 * 1000L
+    private val CHECK_INTERVAL_MS = 30 * 1000L
 
     override fun onCreate() {
         super.onCreate()
