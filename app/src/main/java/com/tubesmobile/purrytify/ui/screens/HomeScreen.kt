@@ -108,7 +108,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
             Text(
                 text = "New songs",
                 color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 20.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -117,7 +117,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -149,7 +149,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
             Text(
                 text = "Recently played",
                 color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 20.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -158,7 +158,7 @@ fun HomeScreen(navController: NavHostController, musicBehaviorViewModel: MusicBe
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -195,7 +195,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     Column(
         modifier = Modifier
-            .width(120.dp)
+            .width(80.dp)
             .clickable { onClick(song) },
         horizontalAlignment = Alignment.Start
     ) {

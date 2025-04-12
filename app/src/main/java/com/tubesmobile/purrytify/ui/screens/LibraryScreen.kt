@@ -101,8 +101,7 @@ fun MusicLibraryScreen(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 11.dp),
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -124,7 +123,7 @@ fun MusicLibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TabButton(
@@ -145,6 +144,7 @@ fun MusicLibraryScreen(
                     onClick = { musicBehaviorViewModel.cyclePlaybackMode() },
                     modifier = Modifier
                         .size(36.dp)
+                        .padding(end = 8.dp)
                 ) {
                     Icon(
                         painter = painterResource(
@@ -166,7 +166,7 @@ fun MusicLibraryScreen(
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(vertical = 8.dp),
                 placeholder = {
                     Text("Search songs...")
                 },
@@ -194,7 +194,7 @@ fun MusicLibraryScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(vertical = 32.dp, horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -216,7 +216,6 @@ fun MusicLibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 16.dp)
                 ) {
                     items(filteredSongs) { song ->
                         SongItem(
