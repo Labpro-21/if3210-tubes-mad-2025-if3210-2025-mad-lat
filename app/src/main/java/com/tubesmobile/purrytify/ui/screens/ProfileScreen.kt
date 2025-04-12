@@ -34,12 +34,13 @@ import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.util.regex.Pattern
 
 @Composable
-fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel) {
+fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicBehaviorViewModel: MusicBehaviorViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.PROFILE) }
     val viewModel: ProfileViewModel = viewModel()
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -129,6 +130,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         onLogout = {
                             viewModel.logout()
                             loginViewModel.resetLoginState()
+                            musicBehaviorViewModel.onCleared()
                             navController.navigate("login") {
                                 popUpTo(0) { inclusive = true }
                             }

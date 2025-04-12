@@ -133,16 +133,6 @@ fun MusicScreen(
                         .size(32.dp)
                         .clickable { navController.popBackStack() }
                 )
-
-                Icon(
-                    // Menu icon
-                    painter = painterResource(id = R.drawable.ic_more),
-                    contentDescription = "More options",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable { /* Show menu */ }
-                )
             }
 
             Spacer(modifier = Modifier.height(64.dp))

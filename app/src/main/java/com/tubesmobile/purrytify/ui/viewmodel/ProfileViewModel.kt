@@ -3,6 +3,8 @@ package com.tubesmobile.purrytify.ui.viewmodel
 import android.app.Application
 import android.content.Intent
 import android.util.Log
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.api.RetrofitClient
@@ -58,14 +60,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun logout() {
         repository.logout()
-        Log.d("logout", "disini masuk")
 
         try {
-            Log.d("logout", "disini dah pasti masuk")
             val serviceIntent = Intent(getApplication(), TokenVerificationService::class.java)
-            Log.d("logout", "belum tentu")
             getApplication<Application>().stopService(serviceIntent)
-            Log.d("logout", "alhamdulillah")
         } catch (e: Exception) {
             Log.e("Logout Error", e.message.toString())
         }

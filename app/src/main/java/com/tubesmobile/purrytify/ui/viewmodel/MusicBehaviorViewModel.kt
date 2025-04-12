@@ -254,7 +254,7 @@ class MusicBehaviorViewModel : ViewModel() {
         }
     }
 
-    override fun onCleared() {
+    public override fun onCleared() {
         super.onCleared()
         mediaPlayer?.release()
         mediaPlayer = null
