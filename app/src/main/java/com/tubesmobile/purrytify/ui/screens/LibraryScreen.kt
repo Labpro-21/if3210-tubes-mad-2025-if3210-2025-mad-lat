@@ -52,7 +52,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.SwipeableUpload
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.PlaybackMode
@@ -81,7 +83,7 @@ fun MusicLibraryScreen(
     val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
+    val isConnected by LocalNetworkStatus.current.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
     var songToEdit by remember { mutableStateOf<Song?>(null) }
 
@@ -264,6 +266,9 @@ fun MusicLibraryScreen(
                     }
                 }
             }
+            if (!isConnected) {
+                NetworkOfflineScreen(24)
+            }
         }
 
         if (showEditDialog && songToEdit != null) {
@@ -314,6 +319,7 @@ fun MusicLibraryScreen(
                 }
             )
         }
+
         if (showPopup) {
             Box(
                 modifier = Modifier

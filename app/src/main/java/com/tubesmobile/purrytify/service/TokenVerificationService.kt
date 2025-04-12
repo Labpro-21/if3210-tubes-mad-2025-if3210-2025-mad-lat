@@ -86,9 +86,9 @@ class TokenVerificationService : Service() {
             if (!refreshResult.isSuccess) {
                 Log.e("TokenService", "Token refresh failed")
                 // Force logout on token refresh failure
-                tokenManager.clearTokens()
-                val intent = Intent(ACTION_LOGOUT)
-                LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+//                tokenManager.clearTokens()
+//                val intent = Intent(ACTION_LOGOUT)
+//                LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
             } else {
                 Log.d("TokenService", "Token refreshed successfully")
                 // Update last refresh time

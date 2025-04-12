@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 
 @Composable
@@ -59,7 +61,7 @@ fun HomeScreen(
     loginViewModel: LoginViewModel
 ) {
     val userName by loginViewModel.userName.collectAsState()
-
+    val isConnected by LocalNetworkStatus.current.collectAsState()
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -229,6 +231,9 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+            if (!isConnected) {
+                NetworkOfflineScreen(24)
             }
         }
     }
