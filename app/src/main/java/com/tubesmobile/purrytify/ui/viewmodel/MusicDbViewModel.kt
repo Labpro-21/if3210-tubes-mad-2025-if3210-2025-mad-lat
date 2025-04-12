@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import androidx.core.net.toFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -18,10 +19,15 @@ import com.tubesmobile.purrytify.ui.screens.SongTimestamp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 class MusicDbViewModel(application: Application) : AndroidViewModel(application) {
     private val songDao = AppDatabase.Companion.getDatabase(application).songDao()
+    private val appContext = application.applicationContext
 
     val allSongs: Flow<List<Song>> =
         songDao.getSongsByUser(DataKeeper.email.toString()).map { entities ->
@@ -48,24 +54,67 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+
+    // Improved artwork extraction method with better error handling
     fun extractAndSaveArtwork(context: Context, uri: Uri): String? {
         val retriever = MediaMetadataRetriever()
-        return try {
+        try {
+            Log.d("ArtworkFix", "Trying to extract artwork from: $uri")
             retriever.setDataSource(context, uri)
-            val art = retriever.embeddedPicture
-            if (art != null) {
+
+            val embeddedArt = try {
+                retriever.embeddedPicture
+            } catch (e: Exception) {
+                Log.d("ArtworkFix", "No embedded artwork found: ${e.message}")
+                null
+            }
+
+            if (embeddedArt != null && embeddedArt.isNotEmpty()) {
                 val filename = "artwork_${System.currentTimeMillis()}.jpg"
                 val file = File(context.filesDir, filename)
-                file.writeBytes(art)
-                file.absolutePath
-            } else null
+                file.writeBytes(embeddedArt)
+                Log.d("ArtworkFix", "Saved embedded artwork to: ${file.absolutePath}")
+                return file.absolutePath
+            }
+
+            return null
         } catch (e: Exception) {
-            null
+            Log.d("ArtworkFix", "Couldn't extract artwork: ${e.message}")
+            return null
         } finally {
-            retriever.release()
+            try {
+                retriever.release()
+            } catch (e: Exception) {
+            }
         }
     }
 
+
+
+    fun saveArtworkFromUri(context: Context, artworkUri: Uri): String? {
+        try {
+            Log.d("ArtworkFix", "Saving artwork from: $artworkUri")
+
+            val inputStream = context.contentResolver.openInputStream(artworkUri)
+                ?: return null
+
+            val filename = "artwork_${System.currentTimeMillis()}.jpg"
+            val file = File(context.filesDir, filename)
+
+            // Copy the file contents
+            FileOutputStream(file).use { outputStream ->
+                inputStream.use { input ->
+                    input.copyTo(outputStream)
+                }
+            }
+
+            Log.d("ArtworkFix", "Saved artwork to: ${file.absolutePath}")
+            return file.absolutePath
+        } catch (e: Exception) {
+            Log.e("ArtworkFix", "Failed to save artwork: ${e.message}")
+            return null
+        }
+    }
 
     fun insertSong(song: Song, userEmail: String){
         viewModelScope.launch {
@@ -103,7 +152,29 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                     )
                     songDao.registerUserToSong(registerUploader.uploaderEmail, registerUploader.songId)
                 } else {
-                    val savedArtworkPath = extractAndSaveArtwork(context, Uri.parse(song.uri)) ?: ""
+                    var savedArtworkPath = ""
+                    // If user selected an artwork, try to save it directly
+                    if (song.artworkUri.isNotEmpty()) {
+                        try {
+                            val artworkUri = Uri.parse(song.artworkUri)
+                            savedArtworkPath = saveArtworkFromUri(context, artworkUri) ?: ""
+                            Log.d("ArtworkFix", "Saved selected artwork: $savedArtworkPath")
+                        } catch (e: Exception) {
+                            Log.e("ArtworkFix", "Failed to save selected artwork: ${e.message}")
+                        }
+                    }
+
+                    // If no artwork saved yet, try to extract from the audio file
+                    if (savedArtworkPath.isEmpty()) {
+                        try {
+                            val audioUri = Uri.parse(song.uri)
+                            savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
+                            Log.d("ArtworkFix", "Extracted audio artwork: $savedArtworkPath")
+                        } catch (e: Exception) {
+                            Log.e("ArtworkFix", "Failed to extract audio artwork: ${e.message}")
+                        }
+                    }
+
                     val entity = SongEntity(
                         title = song.title,
                         artist = song.artist,
@@ -156,7 +227,7 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         return songDao.isSongLiked(DataKeeper.email.toString(), songId)
     }
 
-    // New: Toggle like status
+    // Toggle like status
     fun toggleSongLike(song: Song) {
         viewModelScope.launch {
             if (song.id == null) return@launch
@@ -170,6 +241,7 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
+
     fun updateSong(
         originalSong: Song,
         newTitle: String,
@@ -198,19 +270,36 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 val existingEntity = songDao.getSongById(originalSong.id)
                 if (existingEntity != null) {
                     var updatedArtworkUri = existingEntity.artworkUri
+
                     if (newArtworkUri != null) {
-                        val savedArtworkPath = extractAndSaveArtwork(
-                            getApplication<Application>().applicationContext,
-                            newArtworkUri
-                        )
-                        if (savedArtworkPath != null) {
-                            if (existingEntity.artworkUri?.isNotEmpty() == true) {
+                        Log.d("ArtworkFix", "Processing new artwork: $newArtworkUri")
+
+                        // Delete old artwork if it exists
+                        if (!existingEntity.artworkUri.isNullOrEmpty()) {
+                            try {
                                 val oldFile = File(existingEntity.artworkUri)
-                                if (oldFile.exists()) oldFile.delete()
+                                if (oldFile.exists()) {
+                                    oldFile.delete()
+                                    Log.d("ArtworkFix", "Deleted old artwork: ${existingEntity.artworkUri}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("ArtworkFix", "Error deleting old artwork: ${e.message}")
                             }
-                            updatedArtworkUri = savedArtworkPath
+                        }
+
+                        // Save new artwork - using application context here
+                        try {
+                            val appContext = getApplication<Application>().applicationContext
+                            val savedPath = saveArtworkFromUri(appContext, newArtworkUri)
+                            if (savedPath != null) {
+                                updatedArtworkUri = savedPath
+                                Log.d("ArtworkFix", "Saved new artwork: $savedPath")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("ArtworkFix", "Failed to save new artwork: ${e.message}")
                         }
                     }
+
                     val updatedEntity = existingEntity.copy(
                         title = trimmedTitle,
                         artist = trimmedArtist,

@@ -404,26 +404,31 @@ fun SongItem(
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        imageBitmap = null
-        withContext(Dispatchers.IO) {
-            if (song.artworkUri.isNotEmpty()) {
-                val file = File(song.artworkUri)
-                if (file.exists()) {
-                    try {
-                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        withContext(Dispatchers.Main) {
-                            imageBitmap = bitmap?.asImageBitmap()
+        if (song.artworkUri.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val file = File(song.artworkUri)
+                    if (file.exists()) {
+                        val options = BitmapFactory.Options().apply {
+                            inSampleSize = 2  // Scale down to use less memory
                         }
-                    } catch (e: Exception) {
-                        Log.e("SongItemArtwork", "Error loading artwork: ${song.artworkUri}", e)
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
+                        if (bitmap != null) {
+                            withContext(Dispatchers.Main) {
+                                imageBitmap = bitmap.asImageBitmap()
+                            }
+                        } else {
+                            Log.w("SongItem", "Failed to decode bitmap from: ${song.artworkUri}")
+                        }
+                    } else {
+                        Log.w("SongItem", "Artwork file not found: ${song.artworkUri}")
                     }
-                } else {
-                    Log.w("SongItemArtwork", "Artwork file not found: ${song.artworkUri}")
+                } catch (e: Exception) {
+                    Log.e("SongItem", "Error loading artwork: ${e.message}", e)
                 }
             }
         }
     }
-
 
     Row(
         modifier = Modifier
@@ -432,27 +437,27 @@ fun SongItem(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Box with background to be visible while loading
         Box(
-            modifier = Modifier.size(56.dp).background(MaterialTheme.colorScheme.surfaceVariant), // Placeholder bg
+            modifier = Modifier
+                .size(56.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            when {
-                imageBitmap != null -> {
-                    Image(
-                        bitmap = imageBitmap!!,
-                        contentDescription = song.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-                else -> {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground), // Example placeholder icon
-                        contentDescription = "No artwork",
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            if (imageBitmap != null) {
+                Image(
+                    bitmap = imageBitmap!!,
+                    contentDescription = "Album artwork for ${song.title}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = "No artwork",
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -471,7 +476,7 @@ fun SongItem(
             )
             Text(
                 text = song.artist,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f), // Slightly muted
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -499,7 +504,7 @@ fun SongItem(
                     text = { Text("Edit") },
                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null)},
                     onClick = {
-                        onEditRequest(song) // Call the edit callback
+                        onEditRequest(song)
                         expanded = false
                     }
                 )
@@ -507,7 +512,7 @@ fun SongItem(
                     text = { Text("Delete") },
                     leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
                     onClick = {
-                        onDeleteRequest(song) // Call the delete callback
+                        onDeleteRequest(song)
                         expanded = false
                     }
                 )
