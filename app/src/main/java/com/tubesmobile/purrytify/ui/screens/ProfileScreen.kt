@@ -147,7 +147,6 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                     )
                 }
 
-                ProfileViewModel.ProfileState.Idle -> TODO()
             }
         }
     }
