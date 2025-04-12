@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -101,7 +102,7 @@ fun MusicLibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 16.dp, end = 11.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -123,22 +124,22 @@ fun MusicLibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TabButton(
-                    text = "All Songs",
+                    text = "All",
                     isSelected = selectedTab == "All Songs",
                     onClick = { selectedTab = "All Songs" }
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 TabButton(
-                    text = "Liked Songs",
+                    text = "Liked",
                     isSelected = selectedTab == "Liked Songs",
                     onClick = { selectedTab = "Liked Songs" }
                 )
 
-                Spacer(modifier = Modifier.weight(1f)) // Dorong IconButton ke ujung kanan
+                Spacer(modifier = Modifier.weight(1f)) // Dorong ke kanan
 
                 IconButton(
                     onClick = { musicBehaviorViewModel.cyclePlaybackMode() },
@@ -159,8 +160,6 @@ fun MusicLibraryScreen(
                 }
             }
 
-
-
             // Search Bar
             OutlinedTextField(
                 value = searchQuery,
@@ -178,6 +177,7 @@ fun MusicLibraryScreen(
                     )
                 },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -276,7 +276,7 @@ fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
         ),
         modifier = Modifier
             .height(36.dp)
-            .width(130.dp)
+            .wrapContentWidth()
     ) {
         Text(
             text = text,
