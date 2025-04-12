@@ -78,10 +78,10 @@ fun MusicLibraryScreen(
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val context = LocalContext.current
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    var selectedTab by remember { mutableStateOf("All Songs") }
     var searchQuery by remember { mutableStateOf("") }
     val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val selectedTab by musicBehaviorViewModel.selectedTab.collectAsState()
     val scope = rememberCoroutineScope()
     val isConnected by LocalNetworkStatus.current.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
@@ -153,13 +153,13 @@ fun MusicLibraryScreen(
                 TabButton(
                     text = "All",
                     isSelected = selectedTab == "All Songs",
-                    onClick = { selectedTab = "All Songs" }
+                    onClick = { musicBehaviorViewModel.setSelectedTab("All Songs") }
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 TabButton(
                     text = "Liked",
                     isSelected = selectedTab == "Liked Songs",
-                    onClick = { selectedTab = "Liked Songs" }
+                    onClick = { musicBehaviorViewModel.setSelectedTab("Liked Songs") }
                 )
 
                 Spacer(modifier = Modifier.weight(1f)) // Dorong ke kanan
