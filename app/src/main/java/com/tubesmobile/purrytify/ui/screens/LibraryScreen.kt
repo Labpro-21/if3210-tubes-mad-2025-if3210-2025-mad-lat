@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -160,7 +159,6 @@ fun MusicLibraryScreen(
                 }
             }
 
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -231,7 +229,6 @@ fun MusicLibraryScreen(
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             },
                             onAddToQueue = { musicBehaviorViewModel.addToQueue(it) }
-
                         )
                     }
                 }
@@ -265,7 +262,6 @@ fun MusicLibraryScreen(
     }
 }
 
-
 @Composable
 fun TabButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
     Button(
@@ -293,10 +289,17 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        val file = File(song.artworkUri)
-        if (file.exists()) {
-            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            imageBitmap = bitmap?.asImageBitmap()
+        imageBitmap = null
+        if (song.artworkUri.isNotEmpty() && isSafeFilePath(song.artworkUri)) {
+            val file = File(song.artworkUri)
+            if (file.exists() && file.length() <= 5 * 1024 * 1024) { // batas ukuran file 5mb
+                try {
+                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    imageBitmap = bitmap?.asImageBitmap()
+                } catch (e: Exception) {
+                    Log.e("SongItem", "Error loading artwork", e)
+                }
+            }
         }
     }
 
@@ -307,31 +310,18 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        when {
-            imageBitmap != null -> {
-                Image(
-                    bitmap = imageBitmap!!,
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-
-            song.artworkUri.isEmpty() -> {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-
-            else -> {
-                val resId = song.artworkUri.toIntOrNull() ?: R.drawable.ic_launcher_foreground
-                Image(
-                    painter = painterResource(id = resId),
-                    contentDescription = song.title,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap!!,
+                contentDescription = song.title,
+                modifier = Modifier.size(56.dp)
+            )
+        } else {
+            Image(
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                contentDescription = song.title,
+                modifier = Modifier.size(56.dp)
+            )
         }
 
         Column(
@@ -375,14 +365,6 @@ fun SongItem(song: Song, isPlaying: Boolean, onClick: (Song) -> Unit, onAddToQue
     }
 }
 
-
-//@Preview(showBackground = true)
-//@Composable
-//fun MusicLibraryScreenPreview() {
-//    val navController = rememberNavController()
-//    val previewViewModel: MusicBehaviorViewModel = viewModel()
-//
-//    PurrytifyTheme {
-//        MusicLibraryScreen(navController, previewViewModel)
-//    }
-//}
+private fun isSafeFilePath(path: String): Boolean {
+    return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
+}

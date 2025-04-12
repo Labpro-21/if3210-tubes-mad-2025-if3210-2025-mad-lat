@@ -1,8 +1,10 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.content.ContentResolver
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,7 +41,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,6 +51,7 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import java.io.File
 
 @Composable
 fun MusicScreen(
@@ -68,7 +70,6 @@ fun MusicScreen(
     var isLiked by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-
 
     val song = currentSong
 
@@ -152,37 +153,45 @@ fun MusicScreen(
                     .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
-                val context = LocalContext.current
                 val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
                 val imageBitmap = imageBitmapState.value
 
                 LaunchedEffect(song?.artworkUri) {
                     imageBitmapState.value = null
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        if (song?.artworkUri == "Metadata") {
-                            retriever.setDataSource(context, Uri.parse(song.uri))
-                            val art = retriever.embeddedPicture
-                            if (art != null) {
-                                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                                imageBitmapState.value = bitmap.asImageBitmap()
+                    if (song?.artworkUri?.isNotEmpty() == true) {
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            if (song.artworkUri == "Metadata") {
+                                val uri = Uri.parse(song.uri)
+                                if (!isValidUri(uri, context.contentResolver)) {
+                                    return@LaunchedEffect
+                                }
+                                retriever.setDataSource(context, uri)
+                                val art = retriever.embeddedPicture
+                                if (art != null && art.size <= 5 * 1024 * 1024) { 
+                                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                                    imageBitmapState.value = bitmap?.asImageBitmap()
+                                }
+                            } else {
+                                val file = File(song.artworkUri)
+                                if (file.exists() && isSafeFilePath(file.absolutePath) && file.length() <= 5 * 1024 * 1024) {
+                                    val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
+                                    imageBitmapState.value = fileBitmap?.asImageBitmap()
+                                }
                             }
-                        } else if (!song?.artworkUri.isNullOrEmpty()) {
-                            val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
-                            if (fileBitmap != null) {
-                                imageBitmapState.value = fileBitmap.asImageBitmap()
-                            }
+                        } catch (e: SecurityException) {
+                            Log.e("MusicScreen", "Security exception accessing URI", e)
+                        } catch (e: Exception) {
+                            Log.e("MusicScreen", "Error loading artwork", e)
+                        } finally {
+                            retriever.release()
                         }
-                    } catch (_: Exception) {
-                        imageBitmapState.value = null
-                    } finally {
-                        retriever.release()
                     }
                 }
 
                 if (imageBitmap != null) {
                     Image(
-                        bitmap = imageBitmap!!,
+                        bitmap = imageBitmap,
                         contentDescription = "Album Art",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -195,7 +204,6 @@ fun MusicScreen(
                         contentScale = ContentScale.Crop
                     )
                 }
-
             }
 
             // Song title and artist
@@ -325,6 +333,23 @@ fun MusicScreen(
             Spacer(modifier = Modifier.weight(1f))
         }
     }
+}
+
+private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+    return try {
+        val scheme = uri.scheme
+        if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
+            return false
+        }
+        contentResolver.openInputStream(uri)?.close()
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private fun isSafeFilePath(path: String): Boolean {
+    return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
 }
 
 fun formatMillis(millis: Int): String {

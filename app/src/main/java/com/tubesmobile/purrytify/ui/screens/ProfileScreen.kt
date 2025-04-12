@@ -18,7 +18,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -37,7 +36,7 @@ import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import kotlin.collections.contains
+import java.util.regex.Pattern
 
 @Composable
 fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel) {
@@ -53,7 +52,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
         songsList
-            .filter { it.id !in timestampMap }
+            .filter { it.id != null && it.id !in timestampMap } 
             .sortedByDescending { it.id }
     }
 
@@ -62,7 +61,9 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
     DataKeeper.listenedAmount = songsList.size - newSongs.size
 
     LaunchedEffect(key1 = Unit) {
-        viewModel.loadProfile()
+        if (isConnected) {
+            viewModel.loadProfile()
+        }
     }
 
     Scaffold(
@@ -87,7 +88,6 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
         ) {
-            // Network disconnected banner
             if (!isConnected) {
                 NetworkOfflineScreen(24)
             }
@@ -129,7 +129,6 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         onLogout = {
                             viewModel.logout()
                             loginViewModel.resetLoginState()
-
                             navController.navigate("login") {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -138,7 +137,6 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                 }
                 is ProfileViewModel.ProfileState.SessionExpired -> {
                     LaunchedEffect(Unit) {
-                        // Navigate to login screen
                         loginViewModel.resetLoginState()
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
@@ -148,6 +146,8 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
+
+                ProfileViewModel.ProfileState.Idle -> TODO()
             }
         }
     }
@@ -158,10 +158,10 @@ fun ProfileContent(
     profile: ProfileResponse,
     onLogout: () -> Unit
 ) {
-
     val context = LocalContext.current
-    val baseUrl = "http://34.101.226.132:3000"  // Base URL from the spec
-    val profilePhotoUrl = "$baseUrl/uploads/profile-picture/${profile.profilePhoto}"
+    val baseUrl = "http://34.101.226.132:3000"
+    val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
+    val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
 
     Column(
         modifier = Modifier
@@ -176,13 +176,13 @@ fun ProfileContent(
                 .background(MaterialTheme.colorScheme.primaryContainer)
         )
 
-        // Profile photo using Coil for network image loading
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(profilePhotoUrl)
                 .crossfade(true)
                 .placeholder(R.drawable.ic_launcher_foreground)
                 .error(R.drawable.ic_launcher_foreground)
+                .allowHardware(false) 
                 .build(),
             contentDescription = "Profile Photo",
             contentScale = ContentScale.Crop,
@@ -196,7 +196,7 @@ fun ProfileContent(
 
         // USERNAME
         Text(
-            text = profile.username,
+            text = sanitizeText(profile.username),
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -204,14 +204,14 @@ fun ProfileContent(
 
         // EMAIL
         Text(
-            text = profile.email,
+            text = sanitizeText(profile.email),
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
         )
 
         // LOCATION
         Text(
-            text = profile.location,
+            text = sanitizeText(profile.location),
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
         )
@@ -248,7 +248,6 @@ fun ProfileContent(
             StatItem(label = "LISTENED", value = DataKeeper.listenedAmount.toString())
         }
     }
-
 }
 
 @Composable
@@ -270,11 +269,22 @@ fun StatItem(label: String, value: String) {
     }
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun ProfileScreenPreview() {
-//    val navController = rememberNavController()
-//    PurrytifyTheme {
-//        ProfileScreen(navController)
-//    }
-//}
+private fun sanitizeFileName(fileName: String): String {
+    val maxLength = 100
+    val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "")
+    return if (safeName.length > maxLength) safeName.substring(0, maxLength) else safeName
+}
+
+private fun sanitizeText(text: String): String {
+    val maxLength = 100
+    val safeText = text.replace(Regex("[<>\"&]"), "")
+    return if (safeText.length > maxLength) safeText.substring(0, maxLength) else safeText
+}
+
+private fun isValidEmail(email: String): Boolean {
+    val emailPattern = Pattern.compile(
+        "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+        Pattern.CASE_INSENSITIVE
+    )
+    return emailPattern.matcher(email.trim()).matches()
+}

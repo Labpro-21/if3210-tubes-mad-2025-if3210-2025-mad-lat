@@ -1,18 +1,20 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
+import android.content.ContentResolver
 import android.content.Context
-import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import com.tubesmobile.purrytify.ui.screens.Song
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tubesmobile.purrytify.ui.screens.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 enum class PlaybackMode {
     REPEAT,
@@ -42,23 +44,27 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
 
-
     private var currentIndex = -1
 
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle
 
-
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
 
     fun playSong(song: Song, context: Context) {
+        val uri = Uri.parse(song.uri)
+        if (!isValidUri(uri, context.contentResolver)) {
+            Log.e("MusicBehavior", "Invalid URI: ${song.uri}")
+            return
+        }
+
         _currentSong.value = song
         currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, Uri.parse(song.uri))
+                setDataSource(context, uri)
                 prepare()
                 setOnCompletionListener {
                     playNext(context)
@@ -68,21 +74,27 @@ class MusicBehaviorViewModel : ViewModel() {
                 _isPlaying.value = true
             }
             startUpdatingProgress()
+        } catch (e: SecurityException) {
+            Log.e("MusicBehavior", "Security exception accessing URI", e)
+        } catch (e: IOException) {
+            Log.e("MusicBehavior", "IO error accessing URI", e)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("MusicBehavior", "Error playing song", e)
         }
     }
 
-
     fun togglePlayPause() {
         mediaPlayer?.let {
-            if (it.isPlaying){
-                it.pause()
-                _isPlaying.value = false
-            }
-            else{
-                it.start()
-                _isPlaying.value = true
+            try {
+                if (it.isPlaying) {
+                    it.pause()
+                    _isPlaying.value = false
+                } else {
+                    it.start()
+                    _isPlaying.value = true
+                }
+            } catch (e: IllegalStateException) {
+                Log.e("MusicBehavior", "MediaPlayer in invalid state", e)
             }
         }
     }
@@ -92,7 +104,11 @@ class MusicBehaviorViewModel : ViewModel() {
         updateJob = viewModelScope.launch {
             while (true) {
                 mediaPlayer?.let {
-                    _currentPosition.value= it.currentPosition
+                    try {
+                        _currentPosition.value = it.currentPosition
+                    } catch (e: IllegalStateException) {
+                        Log.e("MusicBehavior", "Error updating progress", e)
+                    }
                 }
                 delay(1000)
             }
@@ -103,29 +119,33 @@ class MusicBehaviorViewModel : ViewModel() {
         _isShuffle.value = !_isShuffle.value
     }
 
-
     fun seekTo(position: Int) {
-        mediaPlayer?.seekTo(position)
-        _currentPosition.value = position
+        mediaPlayer?.let {
+            val validPosition = position.coerceIn(0, it.duration)
+            try {
+                it.seekTo(validPosition)
+                _currentPosition.value = validPosition
+            } catch (e: IllegalStateException) {
+                Log.e("MusicBehavior", "Error seeking to position", e)
+            }
+        }
     }
-
 
     fun setPlaylist(songs: List<Song>) {
         _playlist.clear()
-        _playlist.addAll(songs)
+        _playlist.addAll(songs.filter { isValidSong(it) })
     }
 
     fun playNext(context: Context) {
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
-            Log.d("QUEUE_DEBUG", "Playing from queue: ${nextFromQueue.title}")
+            Log.i("MusicBehavior", "Playing from queue: ${nextFromQueue.title}")
             playSong(nextFromQueue, context)
         } else {
-            Log.d("QUEUE_DEBUG", "Queue is empty, playing from playlist")
+            Log.i("MusicBehavior", "Queue is empty, playing from playlist")
             playNextFromPlaylist(context)
         }
     }
-
 
     private fun playNextFromPlaylist(context: Context) {
         val list = _playlist
@@ -134,7 +154,7 @@ class MusicBehaviorViewModel : ViewModel() {
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
                 _currentSong.value?.let {
-                    Log.d("QUEUE_DEBUG", "REPEAT_ONE: Replaying ${it.title}")
+                    Log.i("MusicBehavior", "REPEAT_ONE: Replaying ${it.title}")
                     playSong(it, context)
                 }
             }
@@ -143,14 +163,14 @@ class MusicBehaviorViewModel : ViewModel() {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    Log.d("QUEUE_DEBUG", "SHUFFLE: Playing ${list[currentIndex].title}")
+                    Log.i("MusicBehavior", "SHUFFLE: Playing ${list[currentIndex].title}")
                     playSong(list[currentIndex], context)
                 }
             }
 
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
-                Log.d("QUEUE_DEBUG", "REPEAT: Playing ${list[currentIndex].title}")
+                Log.i("MusicBehavior", "REPEAT: Playing ${list[currentIndex].title}")
                 playSong(list[currentIndex], context)
             }
         }
@@ -178,16 +198,19 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun addToQueue(song: Song) {
-        _queue.add(song)
-        Log.d("QUEUE_DEBUG", "Added to queue: ${song.title}, new queue size: ${_queue.size}")
+        if (isValidSong(song)) {
+            _queue.add(song)
+            Log.i("MusicBehavior", "Added to queue: ${song.title}, new queue size: ${_queue.size}")
+        } else {
+            Log.w("MusicBehavior", "Invalid song not added to queue: ${song.title}")
+        }
     }
 
-    fun playNextFromQueue(context: Context){
-        if(_queue.isNotEmpty()){
+    fun playNextFromQueue(context: Context) {
+        if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
             playSong(nextSong, context)
-        }
-        else{
+        } else {
             playNext(context)
         }
     }
@@ -195,17 +218,41 @@ class MusicBehaviorViewModel : ViewModel() {
     fun playOrQueueNext(context: Context) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            Log.d("QUEUE", "Playing from queue: ${nextSong.title}")
+            Log.i("MusicBehavior", "Playing from queue: ${nextSong.title}")
             playSong(nextSong, context)
         } else {
-            Log.d("QUEUE", "Queue empty, fallback to playlist next")
+            Log.i("MusicBehavior", "Queue empty, fallback to playlist next")
             playNext(context)
         }
     }
 
-
     override fun onCleared() {
         super.onCleared()
         mediaPlayer?.release()
+        mediaPlayer = null
+        updateJob?.cancel()
+        _currentSong.value = null
+        _playlist.clear()
+        _queue.clear()
+        _currentPosition.value = 0
+        _duration.value = 0
+        _isPlaying.value = false
+    }
+
+    private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+        return try {
+            val scheme = uri.scheme
+            if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
+                return false
+            }
+            contentResolver.openInputStream(uri)?.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isValidSong(song: Song): Boolean {
+        return song.uri.isNotBlank() && song.title.isNotBlank() && song.artist.isNotBlank()
     }
 }
