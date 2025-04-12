@@ -6,7 +6,7 @@ Aplikasi ini adalah Purrytify, yaitu aplikasi pemutar lagu yang diupload oleh pe
 
 ## ✨ Cara Menjalankan Aplikasi
 
-nantian
+Install `app.apk`
 
 ## ✨ Daftar Library
 
@@ -63,22 +63,29 @@ nantian
 
 ## ✨ Screenshot Aplikasi
 
-nantian
+![home](./screenshots/home.jpg)
+![library_all](./screenshots/library_all.jpg)
+![library_liked](./screenshots/library_liked.jpg)
+![profile](./screenshots/profile.jpg)
+![upload_song](./screenshots/upload_song.jpg)
+![music_screen](./screenshots/music_screen.jpg)
+![edit_song](./screenshots/edit_song.jpg)
+![delete_song_popup](./screenshots/delete_song_popup.jpg)
 
 ## ✨ Pembagian Kerja Kelompok
 
-| Fitur              | Kontributor                           |
-| ------------------ | ------------------------------------- |
-| Setup Projek Awal  | [13522147](https://github.com/Nerggg) |
-| Login              | [13522161](https://github.com/akmalrmn) [13522147](https://github.com/Nerggg) |
-| Home               | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
-| Library            | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)|
-| Pemutaran Lagu     | [13522126](https://github.com/rizqikapratamaa)|
-| Penambahan Lagu    | [13522126](https://github.com/rizqikapratamaa) [13522161](https://github.com/akmalrmn)|
-| Profile            | [13522161](https://github.com/akmalrmn) [13522147](https://github.com/Nerggg) |
-| Liked Songs        | [13522126](https://github.com/rizqikapratamaa)|
-| Background Service | [13522161](https://github.com/akmalrmn) |
-| Network Sensing    | [13522161](https://github.com/akmalrmn) |
+| Fitur              | Kontributor                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Setup Projek Awal  | [13522147](https://github.com/Nerggg)                                                                                        |
+| Login              | [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)                                                |
+| Home               | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn) |
+| Library            | [13522126](https://github.com/rizqikapratamaa) [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn) |
+| Pemutaran Lagu     | [13522126](https://github.com/rizqikapratamaa)                                                                               |
+| Penambahan Lagu    | [13522126](https://github.com/rizqikapratamaa) [13522161](https://github.com/akmalrmn)                                       |
+| Profile            | [13522147](https://github.com/Nerggg) [13522161](https://github.com/akmalrmn)                                                |
+| Liked Songs        | [13522126](https://github.com/rizqikapratamaa)                                                                               |
+| Background Service | [13522161](https://github.com/akmalrmn)                                                                                      |
+| Network Sensing    | [13522161](https://github.com/akmalrmn)                                                                                      |
 
 ## ✨ Pengerjaan Bonus
 
