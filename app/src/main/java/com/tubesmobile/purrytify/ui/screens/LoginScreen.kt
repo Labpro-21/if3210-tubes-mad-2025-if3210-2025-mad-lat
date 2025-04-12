@@ -103,7 +103,7 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                 // LOGO AND APP TITLE
                 Image(
                     painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Purritify Logo",
+                    contentDescription = "Purrytify Logo",
                     modifier = Modifier.size(100.dp)
                 )
 
@@ -117,7 +117,7 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                 )
 
                 Text(
-                    text = "Only on Purritify.",
+                    text = "Only on Purrytify.",
                     color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold

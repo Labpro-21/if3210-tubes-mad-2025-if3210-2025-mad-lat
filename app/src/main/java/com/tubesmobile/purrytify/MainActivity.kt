@@ -37,6 +37,7 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlin.math.log
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         loginViewModel.fetchUserEmail()
         super.onCreate(savedInstanceState)
         tokenManager = TokenManager(applicationContext)
