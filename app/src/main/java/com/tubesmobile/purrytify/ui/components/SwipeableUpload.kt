@@ -98,6 +98,7 @@ fun SwipeableUpload(
     val keyboardController = LocalSoftwareKeyboardController.current
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    val isSaveEnabled = existingSong != null || audioUri != null
 
     val context = LocalContext.current
     var pickedFileName by remember { mutableStateOf<String?>(if (existingSong != null) shortenFilename(Uri.parse(existingSong.uri).lastPathSegment ?: "Audio File") else null) }
@@ -271,7 +272,11 @@ fun SwipeableUpload(
                     Spacer(modifier = Modifier.height(20.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         ActionButtonUpload("Cancel", color = MaterialTheme.colorScheme.secondary) { onDismiss() }
-                        ActionButtonUpload("Save", color = MaterialTheme.colorScheme.primary) {
+                        ActionButtonUpload(
+                            "Save",
+                            color = if (isSaveEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            enabled = isSaveEnabled
+                        ) {
                             if (title.isNotBlank() && artist.isNotBlank()) {
                                 if (existingSong != null) {
                                     // Edit mode
@@ -341,13 +346,13 @@ fun UploadBox(label: String, image: ImageBitmap?, onClick: () -> Unit, modifier:
     }
 }
 @Composable
-fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Color, onClick: () -> Unit){
+fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Color, enabled: Boolean = true, onClick: () -> Unit){
     Button(
         onClick = onClick,
-        modifier = Modifier
+        enabled = enabled,
+        modifier = modifier
             .height(48.dp)
-            .width(150.dp)
-        ,
+            .width(150.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -359,6 +364,5 @@ fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Colo
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
-
     }
 }

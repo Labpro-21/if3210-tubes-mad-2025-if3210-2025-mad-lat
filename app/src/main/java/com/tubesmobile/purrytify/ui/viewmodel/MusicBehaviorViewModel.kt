@@ -33,6 +33,9 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _duration = MutableStateFlow(0)
     val duration: StateFlow<Int> = _duration
 
+    private val _selectedTab = MutableStateFlow("All Songs")
+    val selectedTab: StateFlow<String> = _selectedTab
+
     private val _playlist = mutableStateListOf<Song>()
     val playlist: List<Song> get() = _playlist
 
@@ -96,9 +99,10 @@ class MusicBehaviorViewModel : ViewModel() {
         }
     }
 
-    fun toggleShuffle() {
-        _isShuffle.value = !_isShuffle.value
+    fun setSelectedTab(tab: String) {
+        _selectedTab.value = tab
     }
+
 
     fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)

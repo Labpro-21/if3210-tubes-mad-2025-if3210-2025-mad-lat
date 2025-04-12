@@ -220,10 +220,12 @@ fun HomeScreen(
                     items(recentlyPlayedSongs) { song ->
                         RecentlyPlayedItem(
                             song = song,
-                            onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                            onClick = {selectedSong ->
+                                if (selectedSong.uri != currentSong?.uri) {
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}")
+                            }
+                                musicDbViewModel.updateSongTimestamp(selectedSong)
+                                navController.navigate("music/${Screen.LIBRARY.name}")
                             },
                             musicBehaviorViewModel = musicBehaviorViewModel
                         )
