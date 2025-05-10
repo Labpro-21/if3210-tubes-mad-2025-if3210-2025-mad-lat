@@ -8,31 +8,13 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -43,15 +25,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import java.io.File
 
 @Composable
 fun MusicScreen(
@@ -60,17 +40,12 @@ fun MusicScreen(
     musicBehaviorViewModel: MusicBehaviorViewModel,
     musicDbViewModel: MusicDbViewModel
 ) {
-    // Collect the current song from the ViewModel
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
-
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
-
     var isLiked by remember { mutableStateOf(false) }
-
     val context = LocalContext.current
-
     val song = currentSong
 
     val gradientColors = listOf(
@@ -116,7 +91,6 @@ fun MusicScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp)
         ) {
-            // Top bar with back button and menu
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -125,7 +99,6 @@ fun MusicScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    // Back icon
                     painter = painterResource(id = R.drawable.ic_caret),
                     contentDescription = "Back",
                     tint = Color.White,
@@ -148,21 +121,12 @@ fun MusicScreen(
 
                 LaunchedEffect(song?.artworkUri) {
                     imageBitmapState.value = null
-                    if (song?.artworkUri?.isNotEmpty() == true) {
+                    if (song?.artworkUri?.isNotEmpty() == true && song.artworkUri != "Metadata" && !song.artworkUri.startsWith("http")) {
                         val retriever = MediaMetadataRetriever()
                         try {
-                            if (song?.artworkUri == "Metadata") {
-                                retriever.setDataSource(context, Uri.parse(song.uri))
-                                val art = retriever.embeddedPicture
-                                if (art != null) {
-                                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                                    imageBitmapState.value = bitmap.asImageBitmap()
-                                }
-                            } else if (!song?.artworkUri.isNullOrEmpty()) {
-                                val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
-                                if (fileBitmap != null) {
-                                    imageBitmapState.value = fileBitmap.asImageBitmap()
-                                }
+                            val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
+                            if (fileBitmap != null) {
+                                imageBitmapState.value = fileBitmap.asImageBitmap()
                             }
                         } catch (e: SecurityException) {
                             Log.e("MusicScreen", "Security exception accessing URI", e)
@@ -174,24 +138,42 @@ fun MusicScreen(
                     }
                 }
 
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = "Album Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "Album Art",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                when {
+                    song?.artworkUri?.startsWith("http") == true -> {
+                        AsyncImage(
+                            model = song.artworkUri,
+                            contentDescription = "Album Art",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
+                            error = painterResource(id = R.drawable.ic_launcher_foreground)
+                        )
+                    }
+                    imageBitmap != null -> {
+                        Image(
+                            bitmap = imageBitmap,
+                            contentDescription = "Album Art",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    else -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "Album Art",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
             }
 
-            // Song title and artist
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -217,7 +199,6 @@ fun MusicScreen(
                 }
 
                 Icon(
-                    // Heart/like icon
                     painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
                     contentDescription = "Like",
                     tint = Color.White,
@@ -232,14 +213,13 @@ fun MusicScreen(
                 )
             }
 
-            // Progress slider
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp)
             ) {
                 Slider(
-                    value = if (duration > 0) position.toFloat() / duration else 0f, // Current progress
+                    value = if (duration > 0) position.toFloat() / duration else 0f,
                     onValueChange = { newValue ->
                         val newPosition = (newValue * duration).toInt()
                         musicBehaviorViewModel.seekTo(newPosition)
@@ -269,7 +249,6 @@ fun MusicScreen(
                 }
             }
 
-            // Playback controls
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -295,7 +274,6 @@ fun MusicScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        // Play icon
                         painter = painterResource(id = if (isPlaying) R.drawable.pause else R.drawable.play),
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = Color.White,
@@ -331,10 +309,6 @@ private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
     } catch (e: Exception) {
         false
     }
-}
-
-private fun isSafeFilePath(path: String): Boolean {
-    return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
 }
 
 fun formatMillis(millis: Int): String {

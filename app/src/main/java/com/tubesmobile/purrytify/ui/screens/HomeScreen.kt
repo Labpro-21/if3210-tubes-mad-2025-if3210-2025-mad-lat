@@ -220,7 +220,7 @@ fun HomeScreen(
                                         artist = apiSong.artist,
                                         duration = parseDurationToMillis(apiSong.duration),
                                         uri = apiSong.url,
-                                        artworkUri = "Metadata" // Use Metadata to extract artwork from MP3
+                                        artworkUri = apiSong.artwork
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
                                     musicBehaviorViewModel.playSong(song, context)
