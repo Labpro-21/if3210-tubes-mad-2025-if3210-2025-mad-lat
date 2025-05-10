@@ -55,6 +55,10 @@ class MusicBehaviorViewModel : ViewModel() {
     private var updateJob: Job? = null
 
     fun playSong(song: Song, context: Context) {
+        if (!isValidSong(song)) {
+            return
+        }
+
         val uri = Uri.parse(song.uri)
         if (!isValidUri(uri, context.contentResolver)) {
             return
@@ -65,14 +69,21 @@ class MusicBehaviorViewModel : ViewModel() {
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, uri)
-                prepare()
+                // Set data source directly for HTTP/HTTPS or local URIs
+                setDataSource(song.uri)
+                prepareAsync() // Use prepareAsync for streaming
+                setOnPreparedListener {
+                    start()
+                    _duration.value = duration
+                    _isPlaying.value = true
+                }
                 setOnCompletionListener {
                     playNext(context)
                 }
-                start()
-                _duration.value = duration
-                _isPlaying.value = true
+                setOnErrorListener { _, what, extra ->
+                    _isPlaying.value = false
+                    true // Handle error silently
+                }
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
@@ -269,12 +280,15 @@ class MusicBehaviorViewModel : ViewModel() {
 
     private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
         return try {
-            val scheme = uri.scheme
-            if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
-                return false
+            val scheme = uri.scheme?.lowercase()
+            when (scheme) {
+                ContentResolver.SCHEME_CONTENT, ContentResolver.SCHEME_FILE -> {
+                    contentResolver.openInputStream(uri)?.close()
+                    true
+                }
+                "http", "https" -> true // Allow HTTP/HTTPS for streaming
+                else -> false
             }
-            contentResolver.openInputStream(uri)?.close()
-            true
         } catch (e: Exception) {
             false
         }
