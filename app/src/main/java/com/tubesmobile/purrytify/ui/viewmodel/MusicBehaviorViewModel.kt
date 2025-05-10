@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,6 +56,10 @@ class MusicBehaviorViewModel : ViewModel() {
     private var updateJob: Job? = null
 
     fun playSong(song: Song, context: Context) {
+        if (!isValidSong(song)) {
+            return
+        }
+
         val uri = Uri.parse(song.uri)
         if (!isValidUri(uri, context.contentResolver)) {
             return
@@ -65,22 +70,29 @@ class MusicBehaviorViewModel : ViewModel() {
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
+                // Set data source directly for HTTP/HTTPS or local URIs
                 setDataSource(context, uri)
-                prepare()
+                prepareAsync() // Use prepareAsync for streaming
+                setOnPreparedListener {
+                    start()
+                    _duration.value = duration
+                    _isPlaying.value = true
+                }
                 setOnCompletionListener {
                     playNext(context)
                 }
-                start()
-                _duration.value = duration
-                _isPlaying.value = true
+                setOnErrorListener { _, what, extra ->
+                    _isPlaying.value = false
+                    true // Handle error silently
+                }
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
-            // Handle silently for production
+            // Exception handling
         } catch (e: IOException) {
-            // Handle silently for production
+            // Exception handling
         } catch (e: Exception) {
-            // Handle silently for production
+            // Exception handling
         }
     }
 
@@ -269,12 +281,15 @@ class MusicBehaviorViewModel : ViewModel() {
 
     private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
         return try {
-            val scheme = uri.scheme
-            if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
-                return false
+            val scheme = uri.scheme?.lowercase()
+            when (scheme) {
+                ContentResolver.SCHEME_CONTENT, ContentResolver.SCHEME_FILE -> {
+                    contentResolver.openInputStream(uri)?.close()
+                    true
+                }
+                "http", "https" -> true // Allow HTTP/HTTPS for streaming
+                else -> false
             }
-            contentResolver.openInputStream(uri)?.close()
-            true
         } catch (e: Exception) {
             false
         }
