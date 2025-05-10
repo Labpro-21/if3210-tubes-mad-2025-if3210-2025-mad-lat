@@ -21,38 +21,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.data.model.ApiSong
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
-import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
-import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
-import java.io.File
+import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 
 @Composable
 fun HomeScreen(
@@ -65,9 +65,13 @@ fun HomeScreen(
     val currentScreen = remember { mutableStateOf(Screen.HOME) }
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
+    val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val onlineSongs by onlineSongsViewModel.onlineSongs.collectAsState()
+    val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
+    val onlineSongsError by onlineSongsViewModel.error.collectAsState()
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
@@ -151,6 +155,83 @@ fun HomeScreen(
                 )
             }
 
+            // Online Songs Section
+            Text(
+                text = "Global Top Songs",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            when {
+                isLoadingOnlineSongs -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                onlineSongsError != null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = onlineSongsError ?: "Error loading top songs",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                onlineSongs.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No top songs available",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {
+                    LazyRow(
+                        modifier = Modifier.padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(onlineSongs) { apiSong ->
+                            TopSongItem(
+                                apiSong = apiSong,
+                                onClick = {
+                                    val song = Song(
+                                        id = apiSong.id,
+                                        title = apiSong.title,
+                                        artist = apiSong.artist,
+                                        duration = parseDurationToMillis(apiSong.duration),
+                                        uri = apiSong.url,
+                                        artworkUri = apiSong.artwork
+                                    )
+                                    musicDbViewModel.updateSongTimestamp(song)
+                                    musicBehaviorViewModel.playSong(song, context)
+                                    navController.navigate("music/${Screen.HOME.name}")
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             Text(
                 text = "New songs",
                 color = MaterialTheme.colorScheme.onBackground,
@@ -222,10 +303,10 @@ fun HomeScreen(
                     items(recentlyPlayedSongs) { song ->
                         RecentlyPlayedItem(
                             song = song,
-                            onClick = {selectedSong ->
+                            onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
-                                musicBehaviorViewModel.playSong(selectedSong, context)
-                            }
+                                    musicBehaviorViewModel.playSong(selectedSong, context)
+                                }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}")
                             },
@@ -239,6 +320,46 @@ fun HomeScreen(
             }
         }
     }
+}
+
+@Composable
+fun TopSongItem(apiSong: ApiSong, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.Start
+    ) {
+        AsyncImage(
+            model = apiSong.artwork,
+            contentDescription = apiSong.title,
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
+            error = painterResource(id = R.drawable.ic_launcher_foreground)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = apiSong.title,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = apiSong.artist,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
+    }
+}
+
+// Helper function to parse duration (mm:ss) to milliseconds
+private fun parseDurationToMillis(duration: String): Long {
+    val parts = duration.split(":")
+    val minutes = parts[0].toLongOrNull() ?: 0L
+    val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+    return (minutes * 60 + seconds) * 1000
 }
 
 @Composable
@@ -259,15 +380,15 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
             if (song.artworkUri.isNotEmpty()) {
                 val retriever = MediaMetadataRetriever()
                 try {
-                    if (song?.artworkUri == "Metadata") {
+                    if (song.artworkUri == "Metadata") {
                         retriever.setDataSource(context, Uri.parse(song.uri))
                         val art = retriever.embeddedPicture
                         if (art != null) {
                             val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
                             imageBitmapState.value = bitmap.asImageBitmap()
                         }
-                    } else if (!song?.artworkUri.isNullOrEmpty()) {
-                        val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                    } else if (!song.artworkUri.isNullOrEmpty()) {
+                        val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
                         if (fileBitmap != null) {
                             imageBitmapState.value = fileBitmap.asImageBitmap()
                         }
@@ -333,15 +454,15 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
             if (song.artworkUri.isNotEmpty()) {
                 val retriever = MediaMetadataRetriever()
                 try {
-                    if (song?.artworkUri == "Metadata") {
+                    if (song.artworkUri == "Metadata") {
                         retriever.setDataSource(context, Uri.parse(song.uri))
                         val art = retriever.embeddedPicture
                         if (art != null) {
                             val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
                             imageBitmapState.value = bitmap.asImageBitmap()
                         }
-                    } else if (!song?.artworkUri.isNullOrEmpty()) {
-                        val fileBitmap = BitmapFactory.decodeFile(song?.artworkUri)
+                    } else if (!song.artworkUri.isNullOrEmpty()) {
+                        val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
                         if (fileBitmap != null) {
                             imageBitmapState.value = fileBitmap.asImageBitmap()
                         }
@@ -369,8 +490,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
                 contentDescription = song.title,
                 modifier = Modifier
                     .size(60.dp)
-                    .background(MaterialTheme.colorScheme.surface),
-
+                    .background(MaterialTheme.colorScheme.surface)
             )
         }
 
@@ -397,7 +517,6 @@ private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
         if (scheme != ContentResolver.SCHEME_CONTENT && scheme != ContentResolver.SCHEME_FILE) {
             return false
         }
-        // cek apakah uri dapat diakses
         contentResolver.openInputStream(uri)?.close()
         true
     } catch (e: Exception) {
@@ -415,7 +534,7 @@ data class Song(
     val artist: String,
     val duration: Long,
     val uri: String,
-    val artworkUri: String,
+    val artworkUri: String
 )
 
 data class SongTimestamp(

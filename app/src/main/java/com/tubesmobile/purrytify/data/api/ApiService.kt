@@ -16,4 +16,7 @@ interface ApiService {
 
     @GET("api/verify-token")
     suspend fun verifyToken(@Header("Authorization") token: String): Response<Any>
+
+    @GET("api/top-songs/global")
+    suspend fun getTopSongs(@Header("Authorization") token: String): Response<List<ApiSong>>
 }
