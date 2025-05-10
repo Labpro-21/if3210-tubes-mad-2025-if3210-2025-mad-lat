@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,7 +71,7 @@ class MusicBehaviorViewModel : ViewModel() {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
                 // Set data source directly for HTTP/HTTPS or local URIs
-                setDataSource(song.uri)
+                setDataSource(context, uri)
                 prepareAsync() // Use prepareAsync for streaming
                 setOnPreparedListener {
                     start()
@@ -87,11 +88,11 @@ class MusicBehaviorViewModel : ViewModel() {
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
-            // Handle silently for production
+            // Exception handling
         } catch (e: IOException) {
-            // Handle silently for production
+            // Exception handling
         } catch (e: Exception) {
-            // Handle silently for production
+            // Exception handling
         }
     }
 
