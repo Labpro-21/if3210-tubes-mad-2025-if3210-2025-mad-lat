@@ -131,7 +131,7 @@ fun SharedBottomNavigationBar(
                 )
             },
             colors = NavigationBarItemDefaults.colors(
-                indicatorColor = MaterialTheme.colorScheme.surface
+                indicatorColor = Color.Transparent
             )
         )
     }
