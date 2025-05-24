@@ -317,7 +317,7 @@ fun HomeScreen(
                                 onClick = { selectedSong ->
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
                                     musicBehaviorViewModel.playSong(selectedSong, context)
-                                    navController.navigate("music/${Screen.HOME.name}/false")
+                                    navController.navigate("music/${Screen.HOME.name}/false/-1")
                                 },
                                 musicBehaviorViewModel = musicBehaviorViewModel
                             )
@@ -388,7 +388,7 @@ fun HomeScreen(
                                         musicBehaviorViewModel.playSong(selectedSong, context)
                                     }
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
-                                    navController.navigate("music/${Screen.LIBRARY.name}/false")
+                                    navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
                                 },
                                 musicBehaviorViewModel = musicBehaviorViewModel
                             )

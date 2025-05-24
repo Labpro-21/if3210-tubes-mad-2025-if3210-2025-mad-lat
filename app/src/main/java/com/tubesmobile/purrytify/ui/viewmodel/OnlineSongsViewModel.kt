@@ -93,4 +93,17 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
             }
         }
     }
+
+    fun loadSongById(songId: Int, callback: (ApiSong?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val song = _onlineGlobalSongs.value.find { it.id == songId }
+                    ?: _onlineCountrySongs.value.find { it.id == songId }
+                callback(song)
+            } catch (e: Exception) {
+                Log.e("OnlineSongsViewModel", "Error loading song by ID: ${e.message}")
+                callback(null)
+            }
+        }
+    }
 }

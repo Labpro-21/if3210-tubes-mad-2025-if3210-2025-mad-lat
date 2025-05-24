@@ -250,7 +250,7 @@ fun MusicLibraryScreen(
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
-                                navController.navigate("music/${Screen.LIBRARY.name}/false")
+                                navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
                             },
                             onAddToQueue = { musicBehaviorViewModel.addToQueue(it) },
                             onEditRequest = {
