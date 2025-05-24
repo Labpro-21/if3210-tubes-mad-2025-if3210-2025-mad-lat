@@ -86,6 +86,8 @@ fun HomeScreen(
             .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
             .take(5)
     }
+    Log.d("kocokmeong", "recently played song $recentlyPlayedSongs")
+    Log.d("kocokmeong", "new song $newSongs")
 
     Scaffold(
         bottomBar = {
@@ -94,7 +96,8 @@ fun HomeScreen(
                     BottomPlayerBar(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         navController = navController,
-                        fromScreen = Screen.LIBRARY
+                        fromScreen = Screen.LIBRARY,
+                        isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
                     )
                 }
                 SharedBottomNavigationBar(

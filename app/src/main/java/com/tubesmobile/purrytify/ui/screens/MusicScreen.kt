@@ -32,6 +32,7 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun MusicScreen(
@@ -41,6 +42,9 @@ fun MusicScreen(
     musicDbViewModel: MusicDbViewModel,
     isFromApiSong: Boolean = false
 ) {
+    var showPopup by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
@@ -48,6 +52,7 @@ fun MusicScreen(
     var isLiked by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val song = currentSong
+    Log.d("kocokmeong", "lagu yg dimainin $song")
 
     val gradientColors = listOf(
         Color(0xFFBD1E01),
@@ -209,14 +214,23 @@ fun MusicScreen(
                             .clickable {
                                 song?.let { currentSong ->
                                     val songToSave = Song(
+                                        id = null,
                                         title = currentSong.title,
                                         artist = currentSong.artist,
                                         duration = currentSong.duration,
                                         uri = currentSong.uri,
                                         artworkUri = currentSong.artworkUri
                                     )
-                                    // TODO: mekanisme nyimpan
-//                                    musicDbViewModel.insertSong(songToSave)
+                                    musicDbViewModel.checkAndInsertOnlineSong(
+                                        context,
+                                        songToSave,
+                                        onSuccess = { savedSong ->
+                                            scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
+                                        },
+                                        onError = { message ->
+                                            scope.launch { snackbarHostState.showSnackbar(message) }
+                                        }
+                                    )
                                 }
                             }
                     )
@@ -236,7 +250,6 @@ fun MusicScreen(
                     )
                 }
             }
-
 
             Column(
                 modifier = Modifier

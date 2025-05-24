@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.IOException
 
 enum class PlaybackMode {
@@ -70,9 +71,8 @@ class MusicBehaviorViewModel : ViewModel() {
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                // Set data source directly for HTTP/HTTPS or local URIs
                 setDataSource(context, uri)
-                prepareAsync() // Use prepareAsync for streaming
+                prepareAsync()
                 setOnPreparedListener {
                     start()
                     _duration.value = duration
@@ -83,16 +83,13 @@ class MusicBehaviorViewModel : ViewModel() {
                 }
                 setOnErrorListener { _, what, extra ->
                     _isPlaying.value = false
-                    true // Handle error silently
+                    true
                 }
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
-            // Exception handling
         } catch (e: IOException) {
-            // Exception handling
         } catch (e: Exception) {
-            // Exception handling
         }
     }
 
@@ -107,7 +104,6 @@ class MusicBehaviorViewModel : ViewModel() {
                     _isPlaying.value = true
                 }
             } catch (e: IllegalStateException) {
-                // Handle silently for production
             }
         }
     }
@@ -120,7 +116,6 @@ class MusicBehaviorViewModel : ViewModel() {
                     try {
                         _currentPosition.value = it.currentPosition
                     } catch (e: IllegalStateException) {
-                        // Handle silently for production
                     }
                 }
                 delay(1000)
@@ -139,7 +134,6 @@ class MusicBehaviorViewModel : ViewModel() {
                 it.seekTo(validPosition)
                 _currentPosition.value = validPosition
             } catch (e: IllegalStateException) {
-                // Handle silently for production
             }
         }
     }
@@ -287,7 +281,11 @@ class MusicBehaviorViewModel : ViewModel() {
                     contentResolver.openInputStream(uri)?.close()
                     true
                 }
-                "http", "https" -> true // Allow HTTP/HTTPS for streaming
+                "http", "https" -> true
+                null -> {
+                    val file = File(uri.toString())
+                    file.exists()
+                }
                 else -> false
             }
         } catch (e: Exception) {

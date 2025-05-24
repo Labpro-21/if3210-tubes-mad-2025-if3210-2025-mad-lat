@@ -5,6 +5,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -18,8 +19,11 @@ import com.tubesmobile.purrytify.ui.screens.SongTimestamp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
 import java.util.regex.Pattern
 
 class MusicDbViewModel(application: Application) : AndroidViewModel(application) {
@@ -102,6 +106,113 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             return file.absolutePath
         } catch (e: Exception) {
             return null
+        }
+    }
+
+    private suspend fun downloadFile(urlString: String, destination: File): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL(urlString)
+                val connection = url.openConnection()
+                connection.connect()
+                val inputStream = connection.getInputStream()
+                FileOutputStream(destination).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+                inputStream.close()
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
+
+    fun checkAndInsertOnlineSong(
+        context: Context,
+        song: Song,
+        onSuccess: (Song) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (!isValidSong(song) || !isValidEmail(DataKeeper.email ?: "")) {
+            onError("Invalid song data or email")
+            return
+        }
+        viewModelScope.launch {
+            val sanitizedEmail = sanitizeText(DataKeeper.email ?: "")
+            val sanitizedTitle = sanitizeText(song.title)
+            val sanitizedArtist = sanitizeText(song.artist)
+            val existsForUser = songDao.isSongExistsForUser(
+                sanitizedTitle,
+                sanitizedArtist,
+                sanitizedEmail
+            )
+            if (existsForUser) {
+                onError("Song with title '$sanitizedTitle' and artist '$sanitizedArtist' already exists in your library")
+                return@launch
+            }
+
+            val exists = songDao.isSongExists(sanitizedTitle, sanitizedArtist)
+            if (exists) {
+                val songId = songDao.getSongId(sanitizedTitle, sanitizedArtist)
+                songDao.registerUserToSong(sanitizedEmail, songId)
+                val updatedSong = song.copy(id = songId)
+                onSuccess(updatedSong)
+                return@launch
+            }
+
+            // Create Purrytify directory in internal storage
+            val purrytifyDir = File(context.filesDir, "Purrytify")
+            if (!purrytifyDir.exists()) {
+                purrytifyDir.mkdirs()
+            }
+
+            // Download audio file
+            var savedAudioPath = ""
+            val audioFileName = "song_${System.currentTimeMillis()}_${sanitizeFileName(song.uri.substringAfterLast("/"))}"
+            val audioFile = File(purrytifyDir, audioFileName)
+            if (song.uri.startsWith("http")) {
+                val success = downloadFile(song.uri, audioFile)
+                if (!success || !audioFile.exists()) {
+                    onError("Failed to download audio file")
+                    return@launch
+                }
+                savedAudioPath = audioFile.absolutePath
+            } else {
+                onError("Invalid audio URI: must be a remote URL")
+                return@launch
+            }
+
+            // Download artwork file
+            var savedArtworkPath = ""
+            if (song.artworkUri.isNotEmpty() && song.artworkUri.startsWith("http")) {
+                val artworkFileName = "artwork_${System.currentTimeMillis()}_${sanitizeFileName(song.artworkUri.substringAfterLast("/"))}"
+                val artworkFile = File(purrytifyDir, artworkFileName)
+                val success = downloadFile(song.artworkUri, artworkFile)
+                if (success && artworkFile.exists() && artworkFile.length() <= 5 * 1024 * 1024) {
+                    savedArtworkPath = artworkFile.absolutePath
+                }
+            }
+
+            // Fallback to extract artwork from audio file if artwork download fails
+            if (savedArtworkPath.isEmpty()) {
+                val audioUri = Uri.fromFile(audioFile)
+                savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
+            }
+
+            Log.d("kocokmeong", "song path nya $savedAudioPath dan artwork path nya $savedArtworkPath")
+            val entity = SongEntity(
+                title = sanitizedTitle,
+                artist = sanitizedArtist,
+                duration = song.duration,
+                uri = savedAudioPath,
+                artworkUri = savedArtworkPath
+            )
+            Log.d("kocokmeong", "entity yg disimpan $entity")
+            val newId = songDao.insertSong(entity).toInt()
+            songDao.registerUserToSong(sanitizedEmail, newId)
+
+            val updatedSong = song.copy(id = newId, uri = savedAudioPath, artworkUri = savedArtworkPath)
+            onSuccess(updatedSong)
         }
     }
 

@@ -31,7 +31,8 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 fun BottomPlayerBar(
     musicBehaviorViewModel: MusicBehaviorViewModel,
     navController: NavController,
-    fromScreen: Screen
+    fromScreen: Screen,
+    isFromApiSong: Boolean = false
 ) {
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
@@ -43,14 +44,32 @@ fun BottomPlayerBar(
     val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
     val imageBitmap = imageBitmapState.value
 
-    LaunchedEffect(song?.artworkUri) {
+    LaunchedEffect(song?.artworkUri, isFromApiSong) {
         imageBitmapState.value = null
-        if (song?.artworkUri?.isNotEmpty() == true && song.artworkUri != "Metadata" && !song.artworkUri.startsWith("http")) {
+        if (song?.artworkUri?.isNotEmpty() == true && song.artworkUri != "Metadata") {
+            if (isFromApiSong || song.artworkUri.startsWith("http")) {
+                imageBitmapState.value = null
+            } else {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
+                    if (fileBitmap != null) {
+                        imageBitmapState.value = fileBitmap.asImageBitmap()
+                    }
+                } catch (e: Exception) {
+                    imageBitmapState.value = null
+                } finally {
+                    retriever.release()
+                }
+            }
+        } else if (song?.artworkUri == "Metadata" && !isFromApiSong) {
             val retriever = MediaMetadataRetriever()
             try {
-                val fileBitmap = BitmapFactory.decodeFile(song.artworkUri)
-                if (fileBitmap != null) {
-                    imageBitmapState.value = fileBitmap.asImageBitmap()
+                retriever.setDataSource(context, Uri.parse(song.uri))
+                val art = retriever.embeddedPicture
+                if (art != null) {
+                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                    imageBitmapState.value = bitmap.asImageBitmap()
                 }
             } catch (e: Exception) {
                 imageBitmapState.value = null
@@ -65,7 +84,7 @@ fun BottomPlayerBar(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable {
-                navController.navigate("music/${fromScreen.name}")
+                navController.navigate("music/${fromScreen.name}/$isFromApiSong")
             }
     ) {
         Row(
@@ -75,9 +94,9 @@ fun BottomPlayerBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             when {
-                song?.artworkUri?.startsWith("http") == true -> {
+                isFromApiSong || song?.artworkUri?.startsWith("http") == true -> {
                     AsyncImage(
-                        model = song.artworkUri,
+                        model = song?.artworkUri,
                         contentDescription = "Album Art",
                         modifier = Modifier
                             .size(40.dp)
