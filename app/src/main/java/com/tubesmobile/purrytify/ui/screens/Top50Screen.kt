@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,8 +39,11 @@ import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.util.generateQRCode
+import com.tubesmobile.purrytify.util.saveBitmapToCache
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
+import android.content.Intent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,7 +225,7 @@ fun Top50Screen(
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
                                     musicBehaviorViewModel.playSong(song, context)
-                                    navController.navigate("music/${Screen.HOME.name}/true")
+                                    navController.navigate("music/${Screen.HOME.name}/true/-1")
                                 }
                             )
                         }
@@ -234,37 +238,128 @@ fun Top50Screen(
 
 @Composable
 fun TopSongItem(apiSong: ApiSong, onClick: () -> Unit) {
+    val context = LocalContext.current
+    var showShareDialog by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        AsyncImage(
-            model = apiSong.artwork,
-            contentDescription = apiSong.title,
-            modifier = Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
-            error = painterResource(id = R.drawable.ic_launcher_foreground)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = apiSong.title,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = apiSong.artwork,
+                contentDescription = apiSong.title,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
+                error = painterResource(id = R.drawable.ic_launcher_foreground)
             )
-            Text(
-                text = apiSong.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 14.sp
-            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = apiSong.title,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = apiSong.artist,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp
+                )
+            }
         }
+        Icon(
+            painter = painterResource(id = R.drawable.ic_share),
+            contentDescription = "Share",
+            tint = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier
+                .size(24.dp)
+                .clickable { showShareDialog = true }
+        )
     }
+
+    if (showShareDialog) {
+        ShareDialog(
+            songId = apiSong.id,
+            context = context,
+            onDismiss = { showShareDialog = false }
+        )
+    }
+}
+
+@Composable
+fun ShareDialog(
+    songId: Int?,
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Share Song") },
+        text = {
+            Column {
+                Text(
+                    text = "Share as URL",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            songId?.let { id ->
+                                val shareUrl = "purrytify://song/$id"
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Song URL"))
+                            }
+                            onDismiss()
+                        }
+                        .padding(vertical = 8.dp),
+                    fontSize = 16.sp
+                )
+                Text(
+                    text = "Share as QR Code",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            songId?.let { id ->
+                                val shareUrl = "purrytify://song/$id"
+                                val qrBitmap = generateQRCode(shareUrl, 512, 512)
+                                if (qrBitmap != null) {
+                                    val uri = saveBitmapToCache(context, qrBitmap, "song_qr_$id.png")
+                                    if (uri != null) {
+                                        val shareIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            type = "image/png"
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song QR Code"))
+                                    }
+                                }
+                                onDismiss()
+                            }
+                        }
+                        .padding(vertical = 8.dp),
+                    fontSize = 16.sp
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 private fun parseDurationToMillis(duration: String): Long {

@@ -1,6 +1,8 @@
 package com.tubesmobile.purrytify.ui.screens
 
 import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -15,23 +17,33 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
+import com.tubesmobile.purrytify.ui.components.SwipeableAudioDeviceDialog
+import com.tubesmobile.purrytify.ui.viewmodel.AudioDevice
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.util.generateQRCode
+import com.tubesmobile.purrytify.util.saveBitmapToCache
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -40,25 +52,49 @@ fun MusicScreen(
     sourceScreen: Screen,
     musicBehaviorViewModel: MusicBehaviorViewModel,
     musicDbViewModel: MusicDbViewModel,
-    isFromApiSong: Boolean = false
+    isFromApiSong: Boolean = false,
+    songId: Int = -1,
+    onlineSongsViewModel: OnlineSongsViewModel
 ) {
     var showPopup by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
+    val audioError by musicBehaviorViewModel.audioError.collectAsState()
+    val audioDevices by musicBehaviorViewModel.audioDevices.collectAsState()
+    val currentAudioDevice by musicBehaviorViewModel.currentAudioDevice.collectAsState()
     var isLiked by remember { mutableStateOf(false) }
+    var speakerIconPosition by remember { mutableStateOf(Offset(0f, 0f)) }
     val context = LocalContext.current
     val song = currentSong
 
-    val gradientColors = listOf(
-        Color(0xFFBD1E01),
-        Color(0xFF893552),
-        Color(0xFF53062B),
-        Color(0xFF04061D)
-    )
+    LaunchedEffect(songId, song) {
+        Log.d("homescreen kocok", "id nya yg lagi main $songId")
+        if (songId != -1 && song?.id != songId) {
+            onlineSongsViewModel.loadSongById(songId) { apiSong ->
+                if (apiSong != null) {
+                    val song = Song(
+                        id = apiSong.id,
+                        title = apiSong.title,
+                        artist = apiSong.artist,
+                        duration = parseDurationToMillis(apiSong.duration),
+                        uri = apiSong.url,
+                        artworkUri = apiSong.artwork
+                    )
+                    musicBehaviorViewModel.playSong(song, context)
+                    musicDbViewModel.updateSongTimestamp(song)
+                } else {
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Song with ID $songId not found")
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(song?.id) {
         song?.id?.let { songId ->
@@ -66,7 +102,21 @@ fun MusicScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        musicBehaviorViewModel.initializeAudioRouting(context)
+    }
+
+    LaunchedEffect(audioError) {
+        audioError?.let { error ->
+            scope.launch {
+                snackbarHostState.showSnackbar(error)
+                musicBehaviorViewModel.clearAudioError()
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             SharedBottomNavigationBar(
                 currentScreen = sourceScreen,
@@ -91,7 +141,14 @@ fun MusicScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    brush = Brush.verticalGradient(colors = gradientColors)
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFBD1E01),
+                            Color(0xFF893552),
+                            Color(0xFF53062B),
+                            Color(0xFF04061D)
+                        )
+                    )
                 )
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp)
@@ -203,51 +260,72 @@ fun MusicScreen(
                     )
                 }
 
-                if (isFromApiSong) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_download),
-                        contentDescription = "Download",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                song?.let { currentSong ->
-                                    val songToSave = Song(
-                                        id = null,
-                                        title = currentSong.title,
-                                        artist = currentSong.artist,
-                                        duration = currentSong.duration,
-                                        uri = currentSong.uri,
-                                        artworkUri = currentSong.artworkUri
-                                    )
-                                    musicDbViewModel.checkAndInsertOnlineSong(
-                                        context,
-                                        songToSave,
-                                        onSuccess = { savedSong ->
-                                            scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
-                                        },
-                                        onError = { message ->
-                                            scope.launch { snackbarHostState.showSnackbar(message) }
-                                        }
-                                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isFromApiSong) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable { showShareDialog = true }
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_download),
+                            contentDescription = "Download",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    song?.let { song ->
+                                        val songToSave = Song(
+                                            id = null,
+                                            title = song.title,
+                                            artist = song.artist,
+                                            duration = song.duration,
+                                            uri = song.uri,
+                                            artworkUri = song.artworkUri
+                                        )
+                                        musicDbViewModel.checkAndInsertOnlineSong(
+                                            context,
+                                            songToSave,
+                                            onSuccess = { savedSong ->
+                                                scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
+                                            },
+                                            onError = { message ->
+                                                scope.launch { snackbarHostState.showSnackbar(message) }
+                                            }
+                                        )
+                                    }
                                 }
-                            }
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
-                        contentDescription = "Like",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                song?.let {
-                                    musicDbViewModel.toggleSongLike(it)
-                                    isLiked = !isLiked
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
+                            contentDescription = "Like",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    song?.let {
+                                        musicDbViewModel.toggleSongLike(it)
+                                        isLiked = !isLiked
+                                    }
                                 }
-                            }
-                    )
+                        )
+                    }
                 }
+            }
+
+            if (showShareDialog) {
+                ShareDialog(
+                    songId = song?.id,
+                    context = context,
+                    onDismiss = { showShareDialog = false }
+                )
             }
 
             Column(
@@ -328,9 +406,110 @@ fun MusicScreen(
                             musicBehaviorViewModel.playNext(context)
                         }
                 )
+
+                Box {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_add),
+                        contentDescription = "Select Audio Output",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { showPopup = true }
+                            .onGloballyPositioned { coordinates ->
+                                speakerIconPosition = coordinates.positionInRoot()
+                                Log.d("MusicScreen", "Speaker icon position: $speakerIconPosition")
+                            }
+                    )
+                    if (showPopup) {
+                        SwipeableAudioDeviceDialog (
+                            devices = audioDevices,
+                            currentDevice = currentAudioDevice,
+                            onDismiss = { showPopup = false },
+                            onDeviceSelected = { device ->
+                                musicBehaviorViewModel.selectAudioDevice(device, context)
+                                showPopup = false
+                            }
+                        )
+                    }
+                }
             }
 
+            Text(
+                text = "Playing on ${currentAudioDevice?.name ?: "Internal Speaker"}",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
             Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun DeviceDialog(
+    devices: List<AudioDevice>,
+    currentDevice: AudioDevice?,
+    iconPosition: Offset,
+    onDeviceSelected: (AudioDevice) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val density = LocalDensity.current
+    val dialogWidth = 180.dp
+    val dialogHeight = if (devices.size <= 1) 48.dp else (devices.size * 36).dp
+    val offsetX = with(density) { iconPosition.x.toDp() - dialogWidth / 2 }
+    val offsetY = with(density) { iconPosition.y.toDp() - dialogHeight - 12.dp }
+
+    Popup(
+        onDismissRequest = onDismiss,
+        offset = androidx.compose.ui.unit.IntOffset(
+            x = with(density) { offsetX.roundToPx() },
+            y = with(density) { offsetY.roundToPx() }
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .width(dialogWidth)
+                .height(dialogHeight)
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (devices.size <= 1) {
+                    Text(
+                        text = "This Device",
+                        color = Color(0xFF00FF00),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                } else {
+                    devices.forEach { device ->
+                        Text(
+                            text = device.name,
+                            color = if (device == currentDevice) Color(0xFF00FF00) else Color.Black,
+                            fontSize = 14.sp,
+                            fontWeight = if (device == currentDevice) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onDeviceSelected(device)
+                                }
+                                .padding(vertical = 4.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -352,4 +531,11 @@ fun formatMillis(millis: Int): String {
     val minutes = millis / 1000 / 60
     val seconds = (millis / 1000) % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun parseDurationToMillis(duration: String): Long {
+    val parts = duration.split(":")
+    val minutes = parts[0].toLongOrNull() ?: 0L
+    val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+    return (minutes * 60 + seconds) * 1000
 }
