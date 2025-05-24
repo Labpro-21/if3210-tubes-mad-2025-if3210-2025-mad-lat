@@ -76,6 +76,8 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle
 
+    private var userSelectedDeviceId: Int? = null
+
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
     private var audioManager: AudioManager? = null
@@ -107,14 +109,17 @@ class MusicBehaviorViewModel : ViewModel() {
         viewModelScope.launch {
             while (true) {
                 val newDevice = getCurrentRoutedDevice(context)
-                if (newDevice != null && newDevice != _currentAudioDevice.value) {
+
+                if (userSelectedDeviceId == null || newDevice?.id == userSelectedDeviceId) {
                     _currentAudioDevice.value = newDevice
-                    Log.d("AudioRouting", "Detected audio switch to: ${newDevice.name}")
+                    Log.d("AudioRouting", "Detected audio switch to: ${newDevice?.name}")
                 }
+
                 delay(3000)
             }
         }
     }
+
 
     private fun getCurrentRoutedDevice(context: Context): AudioDevice? {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -231,6 +236,9 @@ class MusicBehaviorViewModel : ViewModel() {
             _audioError.value = "Device selection not supported on emulator."
             return
         }
+
+        userSelectedDeviceId = device.id  // <-- Tambahkan ini
+
         try {
             if (device.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
                 setAudioOutputToSpeaker(context)
@@ -253,6 +261,7 @@ class MusicBehaviorViewModel : ViewModel() {
             setAudioOutputToSpeaker(context)
         }
     }
+
 
     fun clearAudioError() {
         _audioError.value = null

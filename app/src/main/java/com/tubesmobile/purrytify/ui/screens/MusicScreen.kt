@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
+import com.tubesmobile.purrytify.ui.components.SwipeableAudioDeviceDialog
 import com.tubesmobile.purrytify.ui.viewmodel.AudioDevice
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.util.generateQRCode
@@ -420,15 +421,14 @@ fun MusicScreen(
                             }
                     )
                     if (showPopup) {
-                        DeviceDialog(
+                        SwipeableAudioDeviceDialog (
                             devices = audioDevices,
                             currentDevice = currentAudioDevice,
-                            iconPosition = speakerIconPosition,
+                            onDismiss = { showPopup = false },
                             onDeviceSelected = { device ->
                                 musicBehaviorViewModel.selectAudioDevice(device, context)
                                 showPopup = false
-                            },
-                            onDismiss = { showPopup = false }
+                            }
                         )
                     }
                 }
