@@ -1,11 +1,18 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
-import android.content.ContentResolver
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.ui.screens.Song
@@ -22,6 +29,13 @@ enum class PlaybackMode {
     REPEAT_ONE,
     SHUFFLE
 }
+
+data class AudioDevice(
+    val name: String,
+    val id: Int,
+    val type: Int,
+    val isConnected: Boolean
+)
 
 class MusicBehaviorViewModel : ViewModel() {
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -48,21 +62,141 @@ class MusicBehaviorViewModel : ViewModel() {
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
 
-    private var currentIndex = -1
+    private val _audioDevices = MutableStateFlow<List<AudioDevice>>(emptyList())
+    val audioDevices: StateFlow<List<AudioDevice>> = _audioDevices
 
+    private val _currentAudioDevice = MutableStateFlow<AudioDevice?>(null)
+    val currentAudioDevice: StateFlow<AudioDevice?> = _currentAudioDevice
+
+    private val _audioError = MutableStateFlow<String?>(null)
+    val audioError: StateFlow<String?> = _audioError
+
+    private var currentIndex = -1
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle
 
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
+    private var audioManager: AudioManager? = null
+    private var bluetoothAdapter: BluetoothAdapter? = null
+
+    private val audioDeviceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            context ?: return
+            when (intent?.action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED,
+                BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                AudioManager.ACTION_AUDIO_BECOMING_NOISY -> {
+                    updateAudioDevices(context)
+                    if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                        setAudioOutputToSpeaker(context)
+                        _audioError.value = "Bluetooth device disconnected. Switched to internal speaker."
+                    }
+                }
+            }
+        }
+    }
+
+    fun initializeAudioRouting(context: Context) {
+        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (bluetoothAdapter == null) {
+            _audioError.value = "Bluetooth is not supported on this device."
+            updateAudioDevices(context) // Still update devices to include internal speaker
+            return
+        }
+        updateAudioDevices(context)
+        registerAudioDeviceReceiver(context)
+    }
+
+    private fun registerAudioDeviceReceiver(context: Context) {
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        }
+        try {
+            ContextCompat.registerReceiver(context, audioDeviceReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        } catch (e: Exception) {
+            _audioError.value = "Failed to register Bluetooth receiver: ${e.message}"
+        }
+    }
+
+    fun updateAudioDevices(context: Context) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val devices = mutableListOf<AudioDevice>()
+
+        // Add internal speaker
+        devices.add(AudioDevice("Internal Speaker", -1, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, true))
+
+        // Add connected audio devices
+        try {
+            val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            availableDevices.forEach { device ->
+                if (device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                    device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES) {
+                    devices.add(AudioDevice(
+                        name = device.productName?.toString() ?: "Unknown Device",
+                        id = device.id,
+                        type = device.type,
+                        isConnected = true
+                    ))
+                }
+            }
+        } catch (e: Exception) {
+            _audioError.value = "Error detecting audio devices: ${e.message}"
+        }
+
+        _audioDevices.value = devices
+        if (_currentAudioDevice.value == null) {
+            _currentAudioDevice.value = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        }
+    }
+
+    fun selectAudioDevice(device: AudioDevice, context: Context) {
+        try {
+            if (device.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                setAudioOutputToSpeaker(context)
+            } else {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                val targetDevice = availableDevices.find { it.id == device.id }
+                if (targetDevice != null) {
+                    mediaPlayer?.setPreferredDevice(targetDevice)
+                    _currentAudioDevice.value = device
+                    _audioError.value = null
+                } else {
+                    _audioError.value = "Selected device not available"
+                    setAudioOutputToSpeaker(context)
+                }
+            }
+        } catch (e: Exception) {
+            _audioError.value = "Error selecting audio device: ${e.message}"
+            setAudioOutputToSpeaker(context)
+        }
+    }
+
+    fun clearAudioError() {
+        _audioError.value = null
+    }
+
+    private fun setAudioOutputToSpeaker(context: Context) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        mediaPlayer?.setPreferredDevice(null) // Reset to default (speaker)
+        _currentAudioDevice.value = _audioDevices.value.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        audioManager.isSpeakerphoneOn = true
+    }
 
     fun playSong(song: Song, context: Context) {
         if (!isValidSong(song)) {
+            _audioError.value = "Invalid song data"
             return
         }
 
         val uri = Uri.parse(song.uri)
         if (!isValidUri(uri, context.contentResolver)) {
+            _audioError.value = "Invalid song URI"
             return
         }
 
@@ -71,25 +205,42 @@ class MusicBehaviorViewModel : ViewModel() {
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(context, uri)
+                val scheme = uri.scheme?.lowercase()
+                if (scheme == "http" || scheme == "https") {
+                    setDataSource(song.uri) // Use direct URL for network sources
+                } else {
+                    setDataSource(context, uri) // Use ContentResolver for local sources
+                }
                 prepareAsync()
                 setOnPreparedListener {
                     start()
                     _duration.value = duration
                     _isPlaying.value = true
+                    _currentAudioDevice.value?.let { device ->
+                        if (device.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                            val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                            val targetDevice = availableDevices.find { it.id == device.id }
+                            setPreferredDevice(targetDevice)
+                        }
+                    }
                 }
                 setOnCompletionListener {
                     playNext(context)
                 }
                 setOnErrorListener { _, what, extra ->
                     _isPlaying.value = false
+                    _audioError.value = "Playback error: code $what, extra $extra"
                     true
                 }
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
+            _audioError.value = "Security error: ${e.message}"
         } catch (e: IOException) {
+            _audioError.value = "IO error: ${e.message}"
         } catch (e: Exception) {
+            _audioError.value = "Unexpected error: ${e.message}"
         }
     }
 
@@ -104,6 +255,7 @@ class MusicBehaviorViewModel : ViewModel() {
                     _isPlaying.value = true
                 }
             } catch (e: IllegalStateException) {
+                _audioError.value = "Playback state error: ${e.message}"
             }
         }
     }
@@ -116,6 +268,7 @@ class MusicBehaviorViewModel : ViewModel() {
                     try {
                         _currentPosition.value = it.currentPosition
                     } catch (e: IllegalStateException) {
+                        _audioError.value = "Progress update error: ${e.message}"
                     }
                 }
                 delay(1000)
@@ -134,6 +287,7 @@ class MusicBehaviorViewModel : ViewModel() {
                 it.seekTo(validPosition)
                 _currentPosition.value = validPosition
             } catch (e: IllegalStateException) {
+                _audioError.value = "Seek error: ${e.message}"
             }
         }
     }
@@ -158,11 +312,8 @@ class MusicBehaviorViewModel : ViewModel() {
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let {
-                    playSong(it, context)
-                }
+                _currentSong.value?.let { playSong(it, context) }
             }
-
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
@@ -170,7 +321,6 @@ class MusicBehaviorViewModel : ViewModel() {
                     playSong(list[currentIndex], context)
                 }
             }
-
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
                 playSong(list[currentIndex], context)
@@ -184,11 +334,8 @@ class MusicBehaviorViewModel : ViewModel() {
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let {
-                    playSong(it, context)
-                }
+                _currentSong.value?.let { playSong(it, context) }
             }
-
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
@@ -196,7 +343,6 @@ class MusicBehaviorViewModel : ViewModel() {
                     playSong(list[currentIndex], context)
                 }
             }
-
             PlaybackMode.REPEAT -> {
                 currentIndex = if (currentIndex <= 0) list.size - 1 else currentIndex - 1
                 playSong(list[currentIndex], context)
@@ -247,12 +393,8 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun hasNextSong(): Boolean {
-        if (_queue.isNotEmpty()) {
-            return true
-        }
-        if (_playlist.isEmpty()) {
-            return false
-        }
+        if (_queue.isNotEmpty()) return true
+        if (_playlist.isEmpty()) return false
         return when (_playbackMode.value) {
             PlaybackMode.REPEAT -> true
             PlaybackMode.SHUFFLE -> _playlist.size > 1
@@ -271,13 +413,16 @@ class MusicBehaviorViewModel : ViewModel() {
         _currentPosition.value = 0
         _duration.value = 0
         _isPlaying.value = false
+        _audioDevices.value = emptyList()
+        _currentAudioDevice.value = null
+        _audioError.value = null
     }
 
-    private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
+    private fun isValidUri(uri: Uri, contentResolver: android.content.ContentResolver): Boolean {
         return try {
             val scheme = uri.scheme?.lowercase()
             when (scheme) {
-                ContentResolver.SCHEME_CONTENT, ContentResolver.SCHEME_FILE -> {
+                android.content.ContentResolver.SCHEME_CONTENT, android.content.ContentResolver.SCHEME_FILE -> {
                     contentResolver.openInputStream(uri)?.close()
                     true
                 }

@@ -101,4 +101,8 @@ dependencies {
 
     // Location Service
     implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
