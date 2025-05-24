@@ -6,4 +6,5 @@ object DataKeeper {
     var likesAmount: Int = 0
     var songsAmount: Int = 0
     var listenedAmount: Int = 0
+    var location: String? = null
 }

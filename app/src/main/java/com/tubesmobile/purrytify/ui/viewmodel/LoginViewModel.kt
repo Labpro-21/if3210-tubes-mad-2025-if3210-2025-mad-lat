@@ -2,6 +2,7 @@ package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.api.RetrofitClient
@@ -70,6 +71,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         _loginState.value = LoginState.Idle
         _userEmail.value = null
         _userName.value = null
+        DataKeeper.location = null
         DataKeeper.email = null
         DataKeeper.username = null
     }
@@ -88,17 +90,20 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                         null
                     }
                     _userName.value = username?.let { sanitizeText(it) }
+                    DataKeeper.location = profile.location
                     DataKeeper.email = _userEmail.value
                     DataKeeper.username = _userName.value
                 } else {
                     _userEmail.value = null
                     _userName.value = null
+                    DataKeeper.location = null
                     DataKeeper.email = null
                     DataKeeper.username = null
                 }
             } catch (e: Exception) {
                 _userEmail.value = null
                 _userName.value = null
+                DataKeeper.location = null
                 DataKeeper.email = null
                 DataKeeper.username = null
                 _loginState.value = LoginState.Error(sanitizeText("Failed to fetch profile"))

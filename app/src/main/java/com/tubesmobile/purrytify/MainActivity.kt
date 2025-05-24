@@ -29,6 +29,7 @@ import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
 import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
+import com.tubesmobile.purrytify.ui.screens.Top50Screen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.components.Screen
@@ -36,7 +37,6 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import kotlin.math.log
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -164,9 +164,11 @@ fun PurrytifyNavHost(
             )
         }
         composable("profile") {
-            ProfileScreen(navController = navController,
+            ProfileScreen(
+                navController = navController,
                 loginViewModel = loginViewModel,
-                musicBehaviorViewModel = musicBehaviorViewModel)
+                musicBehaviorViewModel = musicBehaviorViewModel
+            )
         }
         composable(
             route = "music/{sourceScreen}/{isFromApiSong}",
@@ -186,6 +188,20 @@ fun PurrytifyNavHost(
                 musicBehaviorViewModel = musicBehaviorViewModel,
                 musicDbViewModel = musicDbViewModel,
                 isFromApiSong = isFromApiSong
+            )
+        }
+        composable("top50/global") {
+            Top50Screen(
+                navController = navController,
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                type = "global"
+            )
+        }
+        composable("top50/country") {
+            Top50Screen(
+                navController = navController,
+                musicBehaviorViewModel = musicBehaviorViewModel,
+                type = "country"
             )
         }
     }

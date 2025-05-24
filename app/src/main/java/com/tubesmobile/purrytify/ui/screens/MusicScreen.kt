@@ -52,7 +52,6 @@ fun MusicScreen(
     var isLiked by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val song = currentSong
-    Log.d("kocokmeong", "lagu yg dimainin $song")
 
     val gradientColors = listOf(
         Color(0xFFBD1E01),

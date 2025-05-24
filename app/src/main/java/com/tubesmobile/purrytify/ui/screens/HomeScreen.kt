@@ -5,11 +5,6 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +39,7 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.data.model.ApiSong
+import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.Screen
@@ -69,7 +65,8 @@ fun HomeScreen(
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    val onlineSongs by onlineSongsViewModel.onlineSongs.collectAsState()
+    val onlineGlobalSongs by onlineSongsViewModel.onlineGlobalSongs.collectAsState()
+    val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
     val isLoadingSongs by musicDbViewModel.isLoadingSongs.collectAsState()
     val songsError by musicDbViewModel.songsError.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
@@ -88,8 +85,6 @@ fun HomeScreen(
             .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
             .take(5)
     }
-    Log.d("kocokmeong", "recently played song $recentlyPlayedSongs")
-    Log.d("kocokmeong", "new song $newSongs")
 
     Scaffold(
         bottomBar = {
@@ -150,7 +145,6 @@ fun HomeScreen(
                         lineHeight = 36.sp
                     )
                 }
-
                 Image(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "Purrytify Logo",
@@ -161,7 +155,7 @@ fun HomeScreen(
             }
 
             Text(
-                text = "Global Top Songs",
+                text = "Charts",
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
@@ -187,23 +181,8 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = onlineSongsError ?: "Error loading top songs",
+                            text = onlineSongsError ?: "Error loading charts",
                             color = MaterialTheme.colorScheme.error,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-                onlineSongs.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No top songs available",
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                             fontSize = 16.sp,
                             textAlign = TextAlign.Center
                         )
@@ -214,22 +193,20 @@ fun HomeScreen(
                         modifier = Modifier.padding(bottom = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(onlineSongs) { apiSong ->
-                            TopSongItem(
-                                apiSong = apiSong,
-                                onClick = {
-                                    val song = Song(
-                                        id = apiSong.id,
-                                        title = apiSong.title,
-                                        artist = apiSong.artist,
-                                        duration = parseDurationToMillis(apiSong.duration),
-                                        uri = apiSong.url,
-                                        artworkUri = apiSong.artwork
-                                    )
-                                    musicDbViewModel.updateSongTimestamp(song)
-                                    musicBehaviorViewModel.playSong(song, context)
-                                    navController.navigate("music/${Screen.HOME.name}/true")
-                                }
+                        item {
+                            ChartItem(
+                                title = "Top 50",
+                                subtitle = "GLOBAL",
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                onClick = { navController.navigate("top50/global") }
+                            )
+                        }
+                        item {
+                            ChartItem(
+                                title = "Top 10",
+                                subtitle = "${DataKeeper.location}",
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                onClick = { navController.navigate("top50/country") }
                             )
                         }
                     }
@@ -384,33 +361,37 @@ fun HomeScreen(
 }
 
 @Composable
-fun TopSongItem(apiSong: ApiSong, onClick: () -> Unit) {
+fun ChartItem(
+    title: String,
+    subtitle: String,
+    color: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
     Column(
         modifier = Modifier
-            .width(80.dp)
-            .clickable { onClick() },
-        horizontalAlignment = Alignment.Start
+            .width(100.dp)
+            .clickable { onClick() }
+            .background(color, RoundedCornerShape(12.dp))
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AsyncImage(
-            model = apiSong.artwork,
-            contentDescription = apiSong.title,
-            modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
-            error = painterResource(id = R.drawable.ic_launcher_foreground)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = apiSong.title,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
+            text = title,
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
         Text(
-            text = apiSong.artist,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = subtitle,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
             fontSize = 12.sp
+        )
+        Text(
+            text = "",
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+            fontSize = 10.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp)
         )
     }
 }

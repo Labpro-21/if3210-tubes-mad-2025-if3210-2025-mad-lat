@@ -218,7 +218,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
             }
 
-            Log.d("kocokmeong", "song path nya $savedAudioPath dan artwork path nya $savedArtworkPath")
             val entity = SongEntity(
                 title = sanitizedTitle,
                 artist = sanitizedArtist,
@@ -226,7 +225,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 uri = savedAudioPath,
                 artworkUri = savedArtworkPath
             )
-            Log.d("kocokmeong", "entity yg disimpan $entity")
             val newId = songDao.insertSong(entity).toInt()
             songDao.registerUserToSong(sanitizedEmail, newId)
 
