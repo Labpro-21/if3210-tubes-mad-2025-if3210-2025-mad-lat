@@ -1,10 +1,14 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.Manifest
 import android.content.ContentResolver
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,10 +41,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.zxing.integration.android.IntentIntegrator
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.data.model.ApiSong
 import com.tubesmobile.purrytify.data.model.ProfileResponse
@@ -53,6 +59,7 @@ import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel.ProfileState
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
@@ -62,7 +69,8 @@ fun HomeScreen(
     profileViewModel: ProfileViewModel = viewModel(),
     navController: NavHostController,
     musicBehaviorViewModel: MusicBehaviorViewModel,
-    loginViewModel: LoginViewModel
+    loginViewModel: LoginViewModel,
+    qrScanViewModel: QrScanViewModel = viewModel()
 ) {
     val userName by loginViewModel.userName.collectAsState()
     val isConnected by LocalNetworkStatus.current.collectAsState()
@@ -75,13 +83,82 @@ fun HomeScreen(
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val onlineGlobalSongs by onlineSongsViewModel.onlineGlobalSongs.collectAsState()
     val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
+    Log.d("kocokmeong", "isi global song $onlineGlobalSongs")
+    Log.d("kocokmeong", "isi country song $onlineCountrySongs")
     val isLoadingSongs by musicDbViewModel.isLoadingSongs.collectAsState()
     val songsError by musicDbViewModel.songsError.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
     val onlineSongsError by onlineSongsViewModel.error.collectAsState()
     val profileState by profileViewModel.profile.collectAsState()
+    val scanResult by qrScanViewModel.scanResult.collectAsState()
     val baseUrl = "http://34.101.226.132:3000"
     var dynamicProfilePhotoUrl by remember { mutableStateOf<String?>(null) }
+    var showPermissionDeniedDialog by remember { mutableStateOf(false) }
+
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Start QR code scanning
+            IntentIntegrator(context as androidx.activity.ComponentActivity)
+                .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+                .setPrompt("Scan a QR code")
+                .setCameraId(0)
+                .setBeepEnabled(true)
+                .setBarcodeImageEnabled(true)
+                .initiateScan()
+        } else {
+            showPermissionDeniedDialog = true
+        }
+    }
+
+    // Handle QR code scan result (fallback)
+    val qrScanLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        Log.d("HomeScreen", "QR scan result received: ${result.resultCode}, data: ${result.data}")
+        val scanResult = IntentIntegrator.parseActivityResult(result.resultCode, result.data)
+        if (scanResult != null && scanResult.contents != null) {
+            Log.d("HomeScreen", "QR scan result (launcher): ${scanResult.contents}")
+            qrScanViewModel.setScanResult(scanResult.contents)
+        } else {
+            Log.w("HomeScreen", "No QR scan result or contents found (launcher)")
+            qrScanViewModel.setScanResult(null)
+        }
+    }
+
+    // Handle scan result from ViewModel
+    LaunchedEffect(scanResult) {
+        scanResult?.let { deepLink ->
+            Log.d("HomeScreen", "Processing scan result: $deepLink")
+            val (songId, isValid) = qrScanViewModel.parseDeepLink(deepLink)
+            if (isValid && songId != null) {
+                Log.d("HomeScreen", "Navigating to music screen with songId: $songId")
+                navController.navigate("music/${Screen.HOME.name}/true/$songId") {
+                    popUpTo("home") { inclusive = false }
+                    launchSingleTop = true
+                }
+            } else {
+                Log.e("HomeScreen", "Invalid deep link: $deepLink")
+            }
+            qrScanViewModel.clearScanResult()
+        }
+    }
+
+    // Permission denied dialog
+    if (showPermissionDeniedDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDeniedDialog = false },
+            title = { Text("Camera Permission Denied") },
+            text = { Text("This feature requires camera access to scan QR codes. Please enable camera permission in your device settings.") },
+            confirmButton = {
+                TextButton(onClick = { showPermissionDeniedDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
@@ -198,13 +275,48 @@ fun HomeScreen(
                 )
             }
 
-            Text(
-                text = "Charts",
-                color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Charts",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(
+                    onClick = {
+                        // Check camera permission
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            // Start QR code scanning
+                            IntentIntegrator(context as androidx.activity.ComponentActivity)
+                                .setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+                                .setPrompt("Scan a QR code")
+                                .setCameraId(0)
+                                .setBeepEnabled(true)
+                                .setBarcodeImageEnabled(true)
+                                .initiateScan()
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_camera),
+                        contentDescription = "Scan QR Code",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
 
             when {
                 isLoadingOnlineSongs -> {
