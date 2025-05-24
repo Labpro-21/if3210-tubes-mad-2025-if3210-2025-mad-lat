@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -14,16 +15,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.service.PermissionManager
 import com.tubesmobile.purrytify.service.TokenVerificationService
+import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.screens.HomeScreen
 import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
@@ -32,14 +35,13 @@ import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.screens.Top50Screen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
-import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
+import android.app.Application
+import org.osmdroid.config.Configuration
+import java.io.File // Added for File operations
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
@@ -67,6 +69,24 @@ class MainActivity : ComponentActivity() {
         loginViewModel.fetchUserEmail()
         super.onCreate(savedInstanceState)
         tokenManager = TokenManager(applicationContext)
+
+        // --- OSMDroid Configuration ---
+        val osmConfig = Configuration.getInstance()
+
+        // 1. Set a User Agent using context.packageName
+        osmConfig.userAgentValue = applicationContext.packageName
+
+        // 2. Set base path for osmdroid's cache (app's cache directory is a good place)
+        val osmBasePath = File(applicationContext.cacheDir, "osmdroid")
+        osmConfig.osmdroidBasePath = osmBasePath
+        val osmTileCache = File(osmConfig.osmdroidBasePath, "tiles")
+        osmConfig.osmdroidTileCache = osmTileCache
+
+        // Ensure the directories exist
+        if (!osmBasePath.exists()) osmBasePath.mkdirs()
+        if (!osmTileCache.exists()) osmTileCache.mkdirs()
+
+        Log.i("MyApplication", "OSMDroid configured. User Agent: ${osmConfig.userAgentValue}, Cache: ${osmConfig.osmdroidTileCache.absolutePath}")
 
         if (!PermissionManager.hasAudioPermission(this)) {
             PermissionManager.requestAudioPermission(this)

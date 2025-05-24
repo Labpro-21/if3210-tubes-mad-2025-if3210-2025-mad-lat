@@ -63,21 +63,100 @@ import android.location.Address
 import android.location.Geocoder
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.material.icons.filled.Check
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import java.io.IOException
-import java.util.Locale
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import java.io.IOException // For Geocoder
+import java.util.Locale // For Geocoder
+import com.tubesmobile.purrytify.service.DataKeeper
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
 
 data class ProfileData(
     val currentUsername: String,
     val currentLocation: String?,
     val currentProfilePhotoUrl: String?
 )
+
+@Composable
+fun OsmCountryPickerDialog(
+    onDismissRequest: () -> Unit,
+    onLocationSelected: (geoPoint: GeoPoint) -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val mapView = remember { MapView(context) }
+
+    LaunchedEffect(Unit) {
+        mapView.setTileSource(TileSourceFactory.MAPNIK)
+        mapView.setMultiTouchControls(true)
+        mapView.controller.setZoom(3.0)
+        mapView.controller.setCenter(GeoPoint(20.0, 0.0)) // Default center
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onDetach()
+        }
+    }
+
+    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.8f),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                AndroidView(
+                    factory = { mapView },
+                    modifier = Modifier.fillMaxSize()
+                )
+                Icon(
+                    imageVector = Icons.Filled.Place,
+                    contentDescription = "Center Marker",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+                Button(
+                    onClick = {
+                        val centerGeoPoint = mapView.mapCenter as GeoPoint
+                        onLocationSelected(centerGeoPoint)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = "Confirm")
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Confirm This Location")
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun ProfilePhotoBox(
@@ -216,6 +295,7 @@ fun SwipeableProfileEditDialog(
     val keyboardController = LocalSoftwareKeyboardController.current
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var showOsmMapDialog by remember { mutableStateOf(false) }
 
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var cameraImageUriForPhoto by remember { mutableStateOf<Uri?>(null) }
@@ -299,28 +379,6 @@ fun SwipeableProfileEditDialog(
         }
     }
 
-    val mapsActivityLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            // TODO: Process Google Places SDK result
-            // val place = Autocomplete.getPlaceFromIntent(result.data!!)
-            // val countryComponent = place.addressComponents?.asList()
-            //    ?.find { component -> component.types.contains("country") }
-            // if (countryComponent != null && countryComponent.shortName != null) {
-            //    location = countryComponent.shortName!!
-            // } else {
-            //    errorMessage = "Could not determine country code from selected location."
-            //    showErrorDialog = true
-            // }
-            // Log.i("ProfileEditDialog", "Places SDK result received. Processing needed.")
-            errorMessage = "Manual map selection: Google Places SDK integration needed for result processing."
-            showErrorDialog = true
-        } else {
-            // Log.w("ProfileEditDialog", "Places SDK activity cancelled or failed.")
-        }
-    }
-
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -349,6 +407,7 @@ fun SwipeableProfileEditDialog(
                                                 val countryCode = addresses[0].countryCode // ISO 3166-1 alpha-2
                                                 if (!countryCode.isNullOrEmpty()) {
                                                     location = countryCode.uppercase()
+                                                    DataKeeper.location = countryCode
                                                     Log.i("ProfileEditDialog", "Country code (API 33+): $countryCode")
                                                 } else {
                                                     Log.w("ProfileEditDialog", "Country code not found in address (API 33+).")
@@ -376,6 +435,7 @@ fun SwipeableProfileEditDialog(
                                         val countryCode = addresses[0].countryCode
                                         if (!countryCode.isNullOrEmpty()) {
                                             location = countryCode.uppercase()
+                                            DataKeeper.location = countryCode
                                             Log.i("ProfileEditDialog", "Country code (pre-API 33): $countryCode")
                                         } else {
                                             Log.w("ProfileEditDialog", "Country code not found in address (pre-API 33).")
@@ -524,24 +584,15 @@ fun SwipeableProfileEditDialog(
                             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                             Text("Auto-detect")
                         }
-                        OutlinedButton( // Changed to OutlinedButton
+                        OutlinedButton(
                             onClick = {
-                                // TODO: Setup and launch Google Places Autocomplete Intent
-                                // Example:
-                                // val fields = listOf(Place.Field.ID, Place.Field.NAME, Place.Field.ADDRESS_COMPONENTS)
-                                // val intent = Autocomplete.IntentBuilder(AutocompleteActivityMode.OVERLAY, fields)
-                                //    .setCountries(listOf("ID", "US", "GB")) // Optional: Filter by specific countries
-                                //    .setHint("Search for a country") // Optional: Provide a hint text
-                                //    .build(context)
-                                // mapsActivityLauncher.launch(intent)
-                                errorMessage = "Manual map selection: Google Places SDK setup required."
-                                showErrorDialog = true
+                                showOsmMapDialog = true
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Filled.EditLocation, contentDescription = "Select map icon", modifier = Modifier.size(ButtonDefaults.IconSize))
+                            Icon(Icons.Filled.EditLocation, contentDescription = "Pick on map icon", modifier = Modifier.size(ButtonDefaults.IconSize))
                             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                            Text("Select Map")
+                            Text("Pick on Map") // You can adjust the button text if you like
                         }
                     }
 
@@ -692,5 +743,70 @@ fun SwipeableProfileEditDialog(
                 }
             }
         }
+    }
+    if (showOsmMapDialog) {
+        OsmCountryPickerDialog(
+            onDismissRequest = { showOsmMapDialog = false },
+            onLocationSelected = { geoPoint ->
+                showOsmMapDialog = false // Dismiss map dialog after selection
+                Log.i("ProfileEditDialog", "OSM Map selected: Lat ${geoPoint.latitude}, Lon ${geoPoint.longitude}")
+                try {
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    // Handle Geocoder for different API levels
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1,
+                            object : Geocoder.GeocodeListener {
+                                override fun onGeocode(addresses: MutableList<Address>) {
+                                    if (addresses.isNotEmpty()) {
+                                        addresses[0].countryCode?.let { code ->
+                                            if (code.isNotBlank()) {
+                                                location = code.uppercase()
+                                                DataKeeper.location = location
+                                            }
+                                            else {
+                                                errorMessage = "Country code not found for selected map point."
+                                                showErrorDialog = true
+                                            }
+                                        } ?: run {
+                                            errorMessage = "Country code unavailable for selected map point."
+                                            showErrorDialog = true
+                                        }
+                                    } else {
+                                        errorMessage = "No address details found for selected map point."
+                                        showErrorDialog = true
+                                    }
+                                }
+                                override fun onError(errorMsgFromGeocoder: String?) {
+                                    errorMessage = "Geocoder error: ${errorMsgFromGeocoder ?: "Unknown"}"
+                                    showErrorDialog = true
+                                }
+                            }
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
+                        if (!addresses.isNullOrEmpty()) {
+                            addresses[0].countryCode?.let { code ->
+                                if (code.isNotBlank()) location = code.uppercase()
+                                else {
+                                    errorMessage = "Country code not found for selected map point."
+                                    showErrorDialog = true
+                                }
+                            } ?: run {
+                                errorMessage = "Country code unavailable for selected map point."
+                                showErrorDialog = true
+                            }
+                        } else {
+                            errorMessage = "No address details found for selected map point."
+                            showErrorDialog = true
+                        }
+                    }
+                } catch (e: IOException) {
+                    errorMessage = "Geocoder service not available. Check network connection."
+                    showErrorDialog = true
+                    Log.e("ProfileEditDialog", "Geocoder failed for OSM point", e)
+                }
+            }
+        )
     }
 }
