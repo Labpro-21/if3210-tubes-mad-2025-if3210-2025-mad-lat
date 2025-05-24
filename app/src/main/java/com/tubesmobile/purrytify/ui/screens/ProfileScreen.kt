@@ -35,6 +35,8 @@ import androidx.navigation.compose.rememberNavController
 import com.tubesmobile.purrytify.data.model.ProfileResponse
 import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
+import com.tubesmobile.purrytify.ui.components.ProfileData
+import com.tubesmobile.purrytify.ui.components.SwipeableProfileEditDialog
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
@@ -130,6 +132,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                     val profile = (profileState as ProfileViewModel.ProfileState.Success).profile
                     ProfileContent(
                         profile = profile,
+                        viewModel = viewModel,
                         onLogout = {
                             viewModel.logout()
                             loginViewModel.resetLoginState()
@@ -160,6 +163,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
 @Composable
 fun ProfileContent(
     profile: ProfileResponse,
+    viewModel: ProfileViewModel,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -167,6 +171,7 @@ fun ProfileContent(
     val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
     var expanded by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -254,6 +259,7 @@ fun ProfileContent(
                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                     onClick = {
                         expanded = false
+                        showEditProfileDialog = true
                     }
                 )
                 DropdownMenuItem(
@@ -279,6 +285,30 @@ fun ProfileContent(
             }
         }
     }
+    if (showEditProfileDialog) {
+        val profileDataForDialog = ProfileData(
+            currentUsername = profile.username, // from ProfileResponse
+            currentLocation = profile.location, // from ProfileResponse
+            currentProfilePhotoUrl = if (profile.profilePhoto.isNotEmpty()) "$baseUrl/uploads/profile-picture/${sanitizeFileName(profile.profilePhoto)}" else null // Construct the full URL
+        )
+        SwipeableProfileEditDialog(
+            onDismiss = { showEditProfileDialog = false },
+            existingProfile = profileDataForDialog,
+            onSaveProfile = { locationToSave, profilePhotoUriToSave, onSaveComplete, onError ->
+                viewModel.updateProfile(
+                    location = locationToSave,
+                    profilePhotoUri = profilePhotoUriToSave,
+                    onSuccess = {
+                        viewModel.loadProfile()
+                        onSaveComplete()
+                    },
+                    onFailure = { errorMsg ->
+                        onError(errorMsg)
+                    }
+                )
+            }
+        )
+    }
 }
 
 @Composable
@@ -300,7 +330,7 @@ fun StatItem(label: String, value: String) {
     }
 }
 
-private fun sanitizeFileName(fileName: String): String {
+fun sanitizeFileName(fileName: String): String {
     val maxLength = 100
     val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "")
     return if (safeName.length > maxLength) safeName.substring(0, maxLength) else safeName
