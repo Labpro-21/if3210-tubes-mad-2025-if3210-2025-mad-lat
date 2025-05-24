@@ -49,6 +49,8 @@ fun MusicScreen(
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
+    val currentAudioDevice by musicBehaviorViewModel.currentAudioDevice.collectAsState()
+    val audioError by musicBehaviorViewModel.audioError.collectAsState()
     var isLiked by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val song = currentSong
@@ -66,7 +68,21 @@ fun MusicScreen(
         }
     }
 
+    LaunchedEffect(audioError) {
+        audioError?.let { error ->
+            scope.launch {
+                snackbarHostState.showSnackbar(error)
+                musicBehaviorViewModel.clearAudioError()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        musicBehaviorViewModel.initializeAudioRouting(context)
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             SharedBottomNavigationBar(
                 currentScreen = sourceScreen,
@@ -328,7 +344,27 @@ fun MusicScreen(
                             musicBehaviorViewModel.playNext(context)
                         }
                 )
+
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_add),
+                    contentDescription = "Select Audio Output",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clickable {
+                            navController.navigate("audioDeviceSelection")
+                        }
+                )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Playing on: ${currentAudioDevice?.name ?: "None"}",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
 
             Spacer(modifier = Modifier.weight(1f))
         }
