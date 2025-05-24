@@ -39,7 +39,7 @@ class TokenVerificationService : Service() {
         if (!isRunning) {
             isRunning = true
             scope.launch {
-                startTokenVerification()
+//                startTokenVerification()
             }
         }
         return START_STICKY
@@ -66,7 +66,7 @@ class TokenVerificationService : Service() {
     private suspend fun verifyToken() {
         try {
             Log.d("TokenService", "Verifying token with server...")
-            val verifyResult = userRepository.verifyToken()
+            val verifyResult = tokenManager.verifyToken()
 
             if (!verifyResult.isSuccess) {
                 Log.d("TokenService", "Token verification failed, attempting refresh")
@@ -81,7 +81,7 @@ class TokenVerificationService : Service() {
 
     private suspend fun refreshToken() {
         try {
-            val refreshResult = userRepository.refreshToken()
+            val refreshResult = tokenManager.refreshToken()
 
             if (!refreshResult.isSuccess) {
                 Log.e("TokenService", "Token refresh failed")
