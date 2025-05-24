@@ -98,8 +98,4 @@ dependencies {
 
     // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
-
-    implementation("com.itextpdf.android:kernel-android:7.2.5")
-    implementation("com.itextpdf.android:io-android:7.2.5")
-    implementation("com.itextpdf.android:layout-android:7.2.5")
 }

@@ -41,33 +41,6 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import java.util.regex.Pattern
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment.Companion.CenterVertically
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import com.tubesmobile.purrytify.ui.viewmodel.MonthlyAnalytics
-import com.tubesmobile.purrytify.ui.viewmodel.SoundCapsuleViewModel
-import java.util.concurrent.TimeUnit
-import android.Manifest
-import android.app.Application
-import android.content.pm.PackageManager
-import android.os.Build
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicBehaviorViewModel: MusicBehaviorViewModel) {
@@ -79,36 +52,12 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
-    val soundCapsuleViewModel: SoundCapsuleViewModel = viewModel(
-        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(LocalContext.current.applicationContext as Application)
-    )
-    val monthlyAnalytics by soundCapsuleViewModel.monthlyAnalytics.collectAsState()
-    val context = LocalContext.current
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
         songsList
-            .filter { it.id != null && it.id !in timestampMap }
+            .filter { it.id != null && it.id !in timestampMap } 
             .sortedByDescending { it.id }
-    }
-
-    val requestPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            Toast.makeText(context, "Storage permission granted", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Storage permission denied", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun checkAndRequestStoragePermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            when (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                PackageManager.PERMISSION_GRANTED -> { /* Permission already granted */ }
-                else -> { requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) }
-            }
-        }
     }
 
     DataKeeper.songsAmount = songsList.size
@@ -137,12 +86,11 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
         ) {
             if (!isConnected) {
                 NetworkOfflineScreen(24)
@@ -151,7 +99,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
             when (profileState) {
                 is ProfileViewModel.ProfileState.Loading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
                 is ProfileViewModel.ProfileState.Error -> {
@@ -200,31 +148,11 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         }
                     }
                     CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            SoundCapsuleSection(
-                analytics = monthlyAnalytics,
-                onPreviousMonth = { soundCapsuleViewModel.changeMonth(-1) },
-                onNextMonth = { soundCapsuleViewModel.changeMonth(1) },
-                onExportCSV = {
-                    val currentMonthYear = soundCapsuleViewModel.selectedMonthYear.value
-                    soundCapsuleViewModel.exportAnalyticsToCSV(context, currentMonthYear) { success, message ->
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    }
-                },
-                onExportPDF = {
-                    val currentMonthYear = soundCapsuleViewModel.selectedMonthYear.value
-                    soundCapsuleViewModel.exportAnalyticsToPDF(context, currentMonthYear) { success, message ->
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    }
-                },
-                musicBehaviorViewModel = musicBehaviorViewModel
-            )
-            Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -390,199 +318,4 @@ private fun isValidEmail(email: String): Boolean {
         Pattern.CASE_INSENSITIVE
     )
     return emailPattern.matcher(email.trim()).matches()
-}
-
-@Composable
-fun SoundCapsuleSection(
-    analytics: MonthlyAnalytics?,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
-    onExportCSV: () -> Unit,
-    onExportPDF: () -> Unit,
-    musicBehaviorViewModel: MusicBehaviorViewModel
-) {
-    val context = LocalContext.current
-    val currentSongIsPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
-    val currentSongPositionMs by musicBehaviorViewModel.currentPosition.collectAsState()
-
-    var displayTimeListenedMinutes = analytics?.totalTimeListenedMinutes ?: 0L
-    val currentMonthYearInternal = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Calendar.getInstance().time)
-
-    if (analytics?.monthYearDisplay == SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Calendar.getInstance().time) &&
-        currentSongIsPlaying) {
-        val additionalMinutesThisSession = TimeUnit.MILLISECONDS.toMinutes(currentSongPositionMs.toLong())
-        displayTimeListenedMinutes += additionalMinutesThisSession
-    }
-
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "Your Sound Capsule",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Row {
-                IconButton(onClick = onExportCSV) {
-                    Icon(Icons.Filled.Download, contentDescription = "Export to CSV", tint = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(onClick = onExportPDF) {
-                    Icon(painterResource(id = R.drawable.ic_pdf_export), contentDescription = "Export to PDF", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) // Ganti dengan ikon PDF Anda
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Navigasi Bulan
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            IconButton(onClick = onPreviousMonth) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Previous Month", tint = MaterialTheme.colorScheme.primary)
-            }
-            Text(
-                text = analytics?.monthYearDisplay ?: "Loading...",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            IconButton(onClick = onNextMonth) {
-                Icon(Icons.Filled.ArrowForward, contentDescription = "Next Month", tint = MaterialTheme.colorScheme.primary)
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (analytics == null) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-        } else if (analytics.isEmpty) {
-            Text(
-                text = "No data available for this month.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            AnalyticsCard(
-                label = "Time listened",
-                value = "$displayTimeListenedMinutes minutes",
-                backgroundColor = Color(0xFF2E7D32).copy(alpha = 0.2f)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                AnalyticsCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Top artist",
-                    value = analytics.topArtist ?: "-",
-                    valueDetails = null,
-                    iconResId = R.drawable.ic_artist,
-                    backgroundColor = Color(0xFF0277BD).copy(alpha = 0.2f) // Warna biru lembut
-                )
-                AnalyticsCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Top song",
-                    value = analytics.topSongTitle ?: "-",
-                    valueDetails = if(analytics.topSongArtist != null) "by ${analytics.topSongArtist}" else null,
-                    iconResId = R.drawable.ic_song,
-                    backgroundColor = Color(0xFFD84315).copy(alpha = 0.2f)
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Day Streak
-            if (analytics.dayStreakCount >= 2 && analytics.dayStreakSongTitle != null) {
-                AnalyticsCard(
-                    label = "You had a ${analytics.dayStreakCount}-day streak",
-                    value = "You played ${analytics.dayStreakSongTitle}",
-                    valueDetails = if (analytics.dayStreakSongArtist != null) "by ${analytics.dayStreakSongArtist} day after day. You were on fire!" else "day after day. You were on fire!",
-                    isStreak = true,
-                    backgroundColor = Color(0xFFFFC107).copy(alpha = 0.2f)
-                )
-            } else {
-                AnalyticsCard(
-                    label = "Day Streak",
-                    value = "No significant streak this month.",
-                    backgroundColor = Color.Gray.copy(alpha = 0.1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun AnalyticsCard(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    valueDetails: String? = null,
-    iconResId: Int? = null,
-    isStreak: Boolean = false,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = if (isStreak) Alignment.Start else Alignment.Start
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                iconResId?.let {
-                    Icon(
-                        painter = painterResource(id = it),
-                        contentDescription = label,
-                        modifier = Modifier.size(36.dp).padding(end = 8.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = value,
-                style = if (isStreak) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = if (isStreak) 2 else 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (valueDetails != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = valueDetails,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
 }
