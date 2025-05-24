@@ -1,13 +1,18 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
+import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tubesmobile.purrytify.data.local.db.AppDatabase
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlaybackHistoryEntity
+import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.screens.Song
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,6 +21,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 enum class PlaybackMode {
     REPEAT,
@@ -23,7 +31,7 @@ enum class PlaybackMode {
     SHUFFLE
 }
 
-class MusicBehaviorViewModel : ViewModel() {
+class MusicBehaviorViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong
 
@@ -56,10 +64,22 @@ class MusicBehaviorViewModel : ViewModel() {
     private var mediaPlayer: MediaPlayer? = null
     private var updateJob: Job? = null
 
+    private val playbackHistoryDao = AppDatabase.getDatabase(application).songPlaybackHistoryDao()
+
+    // Variabel untuk melacak sesi pemutaran saat ini
+    private var currentPlaybackSessionId: Long? = null
+    private var currentSessionSong: Song? = null
+    private var currentSessionStartTimeMs: Long? = null
+
+    // Format untuk bulan-tahun
+    private val monthYearFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+
     fun playSong(song: Song, context: Context) {
         if (!isValidSong(song)) {
             return
         }
+
+        finalizeCurrentPlaybackSession()
 
         val uri = Uri.parse(song.uri)
         if (!isValidUri(uri, context.contentResolver)) {
@@ -67,6 +87,7 @@ class MusicBehaviorViewModel : ViewModel() {
         }
 
         _currentSong.value = song
+        currentSessionSong = song
         currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
@@ -77,19 +98,81 @@ class MusicBehaviorViewModel : ViewModel() {
                     start()
                     _duration.value = duration
                     _isPlaying.value = true
+                    startNewPlaybackSession(song)
                 }
                 setOnCompletionListener {
+                    finalizeCurrentPlaybackSession()
                     playNext(context)
                 }
                 setOnErrorListener { _, what, extra ->
                     _isPlaying.value = false
+                    finalizeCurrentPlaybackSession()
                     true
                 }
             }
             startUpdatingProgress()
         } catch (e: SecurityException) {
-        } catch (e: IOException) {
-        } catch (e: Exception) {
+            finalizeCurrentPlaybackSession()
+            Log.e("MusicBehaviorVM", "Error playing song: ${song.title}", e)
+        }
+    }
+
+    private fun startNewPlaybackSession(song: Song) {
+        viewModelScope.launch {
+            val userEmail = DataKeeper.email ?: return@launch
+            if (song.id == null) { // Pastikan song.id tidak null
+                Log.e("MusicBehaviorVM", "Cannot start session, song ID is null for ${song.title}")
+                return@launch
+            }
+
+            currentSessionStartTimeMs = System.currentTimeMillis()
+            val playedAtMonthYear = monthYearFormat.format(Calendar.getInstance().time)
+
+            val newEvent = SongPlaybackHistoryEntity(
+                userEmail = userEmail,
+                songId = song.id,
+                songTitle = song.title,
+                songArtist = song.artist,
+                startTimestampMs = currentSessionStartTimeMs!!,
+                durationListenedMs = 0,
+                playedAtMonthYear = playedAtMonthYear
+            )
+            currentPlaybackSessionId = playbackHistoryDao.insertPlaybackEvent(newEvent)
+            Log.d("MusicBehaviorVM", "Started playback session for ${song.title}, session ID: $currentPlaybackSessionId")
+        }
+    }
+
+    private fun finalizeCurrentPlaybackSession() {
+        viewModelScope.launch {
+            val sessionId = currentPlaybackSessionId ?: return@launch
+            val startTime = currentSessionStartTimeMs ?: return@launch
+            val song = currentSessionSong ?: return@launch
+            val userEmail = DataKeeper.email ?: return@launch
+            if (song.id == null) return@launch
+
+
+            val durationListened = System.currentTimeMillis() - startTime
+            if (durationListened > 5000) {
+                val playedAtMonthYear = monthYearFormat.format(Calendar.getInstance().time)
+                val eventToUpdate = SongPlaybackHistoryEntity(
+                    id = sessionId,
+                    userEmail = userEmail,
+                    songId = song.id,
+                    songTitle = song.title,
+                    songArtist = song.artist,
+                    startTimestampMs = startTime,
+                    durationListenedMs = durationListened,
+                    playedAtMonthYear = playedAtMonthYear
+                )
+                playbackHistoryDao.updatePlaybackEvent(eventToUpdate)
+                Log.d("MusicBehaviorVM", "Finalized playback session for ${song.title}, duration: $durationListened ms")
+            } else {
+                Log.d("MusicBehaviorVM", "Playback session for ${song.title} too short ($durationListened ms), not significantly updated.")
+            }
+
+            currentPlaybackSessionId = null
+            currentSessionStartTimeMs = null
+            currentSessionSong = null
         }
     }
 
@@ -99,9 +182,13 @@ class MusicBehaviorViewModel : ViewModel() {
                 if (it.isPlaying) {
                     it.pause()
                     _isPlaying.value = false
+                    finalizeCurrentPlaybackSession()
                 } else {
                     it.start()
                     _isPlaying.value = true
+                    if (currentPlaybackSessionId == null && _currentSong.value != null) {
+                        startNewPlaybackSession(_currentSong.value!!)
+                    }
                 }
             } catch (e: IllegalStateException) {
             }
@@ -144,6 +231,7 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun playNext(context: Context) {
+        finalizeCurrentPlaybackSession()
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
             playSong(nextFromQueue, context)
@@ -179,6 +267,7 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun playPrevious(context: Context) {
+        finalizeCurrentPlaybackSession()
         val list = _playlist
         if (list.isEmpty()) return
 
@@ -237,6 +326,7 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     fun stopPlayback() {
+        finalizeCurrentPlaybackSession()
         mediaPlayer?.apply {
             if (isPlaying) {
                 stop()
@@ -261,6 +351,7 @@ class MusicBehaviorViewModel : ViewModel() {
     }
 
     public override fun onCleared() {
+        finalizeCurrentPlaybackSession()
         super.onCleared()
         mediaPlayer?.release()
         mediaPlayer = null
