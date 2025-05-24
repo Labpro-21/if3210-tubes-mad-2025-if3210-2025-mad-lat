@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -163,90 +166,117 @@ fun ProfileContent(
     val baseUrl = "http://34.101.226.132:3000"
     val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
+    var expanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 51.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-        )
-
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(profilePhotoUrl)
-                .crossfade(true)
-                .placeholder(R.drawable.ic_launcher_foreground)
-                .error(R.drawable.ic_launcher_foreground)
-                .allowHardware(false) 
-                .build(),
-            contentDescription = "Profile Photo",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // USERNAME
-        Text(
-            text = sanitizeText(profile.username),
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        // EMAIL
-        Text(
-            text = sanitizeText(profile.email),
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-        )
-
-        // LOCATION
-        Text(
-            text = sanitizeText(profile.location),
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // LOGOUT BUTTON
-        OutlinedButton(
-            onClick = onLogout,
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error
-            ),
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth(0.5f)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Logout",
-                fontSize = 16.sp
+            Spacer(modifier = Modifier.height(51.dp))
+
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(profilePhotoUrl)
+                    .crossfade(true)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .allowHardware(false)
+                    .build(),
+                contentDescription = "Profile Photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // USERNAME
+            Text(
+                text = sanitizeText(profile.username),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            // EMAIL
+            Text(
+                text = sanitizeText(profile.email),
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+
+            // LOCATION
+            Text(
+                text = sanitizeText(profile.location),
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // STATS
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(label = "SONGS", value = DataKeeper.songsAmount.toString())
+                StatItem(label = "LIKED", value = DataKeeper.likesAmount.toString())
+                StatItem(label = "LISTENED", value = DataKeeper.listenedAmount.toString())
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // STATS
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
         ) {
-            StatItem(label = "SONGS", value = DataKeeper.songsAmount.toString())
-            StatItem(label = "LIKED", value = DataKeeper.likesAmount.toString())
-            StatItem(label = "LISTENED", value = DataKeeper.listenedAmount.toString())
+            IconButton(onClick = { expanded = true }) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Edit Profile") },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "Logout",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 15.sp
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.ExitToApp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    onClick = {
+                        onLogout()
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
