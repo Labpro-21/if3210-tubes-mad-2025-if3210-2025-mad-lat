@@ -70,6 +70,8 @@ fun HomeScreen(
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val onlineSongs by onlineSongsViewModel.onlineSongs.collectAsState()
+    val isLoadingSongs by musicDbViewModel.isLoadingSongs.collectAsState()
+    val songsError by musicDbViewModel.songsError.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
     val onlineSongsError by onlineSongsViewModel.error.collectAsState()
 
@@ -158,7 +160,6 @@ fun HomeScreen(
                 )
             }
 
-            // Online Songs Section
             Text(
                 text = "Global Top Songs",
                 color = MaterialTheme.colorScheme.onBackground,
@@ -243,35 +244,63 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (newSongs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No new songs available",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                        fontSize = 16.sp,
-                        textAlign = TextAlign.Center
-                    )
+            when {
+                isLoadingSongs -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            } else {
-                LazyRow(
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(newSongs) { song ->
-                        NewSongItem(
-                            song = song,
-                            onClick = { selectedSong ->
-                                musicDbViewModel.updateSongTimestamp(selectedSong)
-                                musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}/false")
-                            },
-                            musicBehaviorViewModel = musicBehaviorViewModel
+                songsError != null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = songsError ?: "Error loading new songs",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
                         )
+                    }
+                }
+                newSongs.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No new songs available",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {
+                    LazyRow(
+                        modifier = Modifier.padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(newSongs) { song ->
+                            NewSongItem(
+                                song = song,
+                                onClick = { selectedSong ->
+                                    musicDbViewModel.updateSongTimestamp(selectedSong)
+                                    musicBehaviorViewModel.playSong(selectedSong, context)
+                                    navController.navigate("music/${Screen.HOME.name}/false")
+                                },
+                                musicBehaviorViewModel = musicBehaviorViewModel
+                            )
+                        }
                     }
                 }
             }
@@ -284,40 +313,69 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (recentlyPlayedSongs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No recently played songs",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                        fontSize = 16.sp,
-                        textAlign = TextAlign.Center
-                    )
+            when {
+                isLoadingSongs -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(recentlyPlayedSongs) { song ->
-                        RecentlyPlayedItem(
-                            song = song,
-                            onClick = { selectedSong ->
-                                if (selectedSong.uri != currentSong?.uri) {
-                                    musicBehaviorViewModel.playSong(selectedSong, context)
-                                }
-                                musicDbViewModel.updateSongTimestamp(selectedSong)
-                                navController.navigate("music/${Screen.LIBRARY.name}/false")
-                            },
-                            musicBehaviorViewModel = musicBehaviorViewModel
+                songsError != null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = songsError ?: "Error loading recently played songs",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
+                recentlyPlayedSongs.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No recently played songs",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(recentlyPlayedSongs) { song ->
+                            RecentlyPlayedItem(
+                                song = song,
+                                onClick = { selectedSong ->
+                                    if (selectedSong.uri != currentSong?.uri) {
+                                        musicBehaviorViewModel.playSong(selectedSong, context)
+                                    }
+                                    musicDbViewModel.updateSongTimestamp(selectedSong)
+                                    navController.navigate("music/${Screen.LIBRARY.name}/false")
+                                },
+                                musicBehaviorViewModel = musicBehaviorViewModel
+                            )
+                        }
+                    }
+                }
             }
+
             if (!isConnected) {
                 NetworkOfflineScreen(24)
             }
@@ -357,7 +415,6 @@ fun TopSongItem(apiSong: ApiSong, onClick: () -> Unit) {
     }
 }
 
-// Helper function to parse duration (mm:ss) to milliseconds
 private fun parseDurationToMillis(duration: String): Long {
     val parts = duration.split(":")
     val minutes = parts[0].toLongOrNull() ?: 0L

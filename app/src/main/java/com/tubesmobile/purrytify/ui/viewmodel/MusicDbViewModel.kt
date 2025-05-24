@@ -1,5 +1,8 @@
 package com.tubesmobile.purrytify.viewmodel
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
@@ -55,6 +58,27 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+    private val _isLoadingSongs = MutableStateFlow(true)
+    val isLoadingSongs: StateFlow<Boolean> = _isLoadingSongs
+
+    private val _songsError = MutableStateFlow<String?>(null)
+    val songsError: StateFlow<String?> = _songsError
+
+    init {
+        viewModelScope.launch {
+            try {
+                combine(allSongs, songsTimestamp) { songs, timestamps ->
+                    Pair(songs, timestamps)
+                }.collect {
+                    _isLoadingSongs.value = false
+                }
+            } catch (e: Exception) {
+                _isLoadingSongs.value = false
+                _songsError.value = "Error loading songs: ${e.message}"
+            }
+        }
+    }
+
     fun extractAndSaveArtwork(context: Context, uri: Uri): String? {
         if (!isValidUri(uri, context.contentResolver)) {
             return null
@@ -81,7 +105,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
             try {
                 retriever.release()
             } catch (e: Exception) {
-                // Handle silently
             }
         }
     }
@@ -160,13 +183,11 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
-            // Create Purrytify directory in internal storage
             val purrytifyDir = File(context.filesDir, "Purrytify")
             if (!purrytifyDir.exists()) {
                 purrytifyDir.mkdirs()
             }
 
-            // Download audio file
             var savedAudioPath = ""
             val audioFileName = "song_${System.currentTimeMillis()}_${sanitizeFileName(song.uri.substringAfterLast("/"))}"
             val audioFile = File(purrytifyDir, audioFileName)
@@ -182,7 +203,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
-            // Download artwork file
             var savedArtworkPath = ""
             if (song.artworkUri.isNotEmpty() && song.artworkUri.startsWith("http")) {
                 val artworkFileName = "artwork_${System.currentTimeMillis()}_${sanitizeFileName(song.artworkUri.substringAfterLast("/"))}"
@@ -193,7 +213,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
 
-            // Fallback to extract artwork from audio file if artwork download fails
             if (savedArtworkPath.isEmpty()) {
                 val audioUri = Uri.fromFile(audioFile)
                 savedArtworkPath = extractAndSaveArtwork(context, audioUri) ?: ""
@@ -373,7 +392,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                                     oldFile.delete()
                                 }
                             } catch (e: Exception) {
-                                // Handle silently
                             }
                         }
                         val savedPath = saveArtworkFromUri(appContext, newArtworkUri)
@@ -412,7 +430,6 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
                             artworkFile.delete()
                         }
                     } catch (e: Exception) {
-                        // Handle silently
                     }
                 }
                 songDao.deleteSongById(songId)
