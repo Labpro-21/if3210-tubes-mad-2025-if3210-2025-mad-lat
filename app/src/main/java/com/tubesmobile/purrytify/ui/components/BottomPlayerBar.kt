@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.components
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -149,16 +150,42 @@ fun BottomPlayerBar(
                     lineHeight = 14.sp
                 )
             }
-            IconButton(
-                onClick = {
-                    musicBehaviorViewModel.togglePlayPause()
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(id = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play),
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+                if (isFromApiSong) {
+                    IconButton(
+                        onClick = {
+                            song?.id?.let { songId ->
+                                val shareUrl = "purrytify://song/$songId"
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Song"))
+                            }
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = {
+                        musicBehaviorViewModel.togglePlayPause()
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play),
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 
