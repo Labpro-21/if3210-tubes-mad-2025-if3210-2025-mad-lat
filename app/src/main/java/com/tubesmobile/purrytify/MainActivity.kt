@@ -31,6 +31,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navArgument
 import com.google.zxing.integration.android.IntentIntegrator
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.service.PermissionManager
@@ -50,6 +51,9 @@ import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import android.app.Application
+import org.osmdroid.config.Configuration
+import java.io.File // Added for File operations
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 
 class MainActivity : ComponentActivity() {
@@ -107,6 +111,24 @@ class MainActivity : ComponentActivity() {
                 return
             }
         }
+
+        // --- OSMDroid Configuration ---
+        val osmConfig = Configuration.getInstance()
+
+        // 1. Set a User Agent using context.packageName
+        osmConfig.userAgentValue = applicationContext.packageName
+
+        // 2. Set base path for osmdroid's cache (app's cache directory is a good place)
+        val osmBasePath = File(applicationContext.cacheDir, "osmdroid")
+        osmConfig.osmdroidBasePath = osmBasePath
+        val osmTileCache = File(osmConfig.osmdroidBasePath, "tiles")
+        osmConfig.osmdroidTileCache = osmTileCache
+
+        // Ensure the directories exist
+        if (!osmBasePath.exists()) osmBasePath.mkdirs()
+        if (!osmTileCache.exists()) osmTileCache.mkdirs()
+
+        Log.i("MyApplication", "OSMDroid configured. User Agent: ${osmConfig.userAgentValue}, Cache: ${osmConfig.osmdroidTileCache.absolutePath}")
 
         if (!PermissionManager.hasAudioPermission(this)) {
             PermissionManager.requestAudioPermission(this)
