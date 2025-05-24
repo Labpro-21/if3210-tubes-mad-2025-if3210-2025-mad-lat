@@ -1,5 +1,6 @@
 package com.tubesmobile.purrytify.ui.components
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
@@ -27,6 +28,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.util.generateQRCode
+import com.tubesmobile.purrytify.util.saveBitmapToCache
 
 @Composable
 fun BottomPlayerBar(
@@ -44,6 +47,7 @@ fun BottomPlayerBar(
     val context = LocalContext.current
     val imageBitmapState = remember { mutableStateOf<ImageBitmap?>(null) }
     val imageBitmap = imageBitmapState.value
+    var showShareDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(song?.artworkUri, isFromApiSong) {
         imageBitmapState.value = null
@@ -156,17 +160,7 @@ fun BottomPlayerBar(
             ) {
                 if (isFromApiSong) {
                     IconButton(
-                        onClick = {
-                            song?.id?.let { songId ->
-                                val shareUrl = "purrytify://song/$songId"
-                                val shareIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
-                                    type = "text/plain"
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Song"))
-                            }
-                        }
+                        onClick = { showShareDialog = true }
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_share),
@@ -198,4 +192,79 @@ fun BottomPlayerBar(
             trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
         )
     }
+
+    if (showShareDialog) {
+        ShareDialog(
+            songId = song?.id,
+            context = context,
+            onDismiss = { showShareDialog = false }
+        )
+    }
+}
+
+@Composable
+fun ShareDialog(
+    songId: Int?,
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Share Song") },
+        text = {
+            Column {
+                Text(
+                    text = "Share as URL",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            songId?.let { id ->
+                                val shareUrl = "purrytify://song/$id"
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Song URL"))
+                            }
+                            onDismiss()
+                        }
+                        .padding(vertical = 8.dp),
+                    fontSize = 16.sp
+                )
+                Text(
+                    text = "Share as QR Code",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            songId?.let { id ->
+                                val shareUrl = "purrytify://song/$id"
+                                val qrBitmap = generateQRCode(shareUrl, 512, 512)
+                                if (qrBitmap != null) {
+                                    val uri = saveBitmapToCache(context, qrBitmap, "song_qr_$id.png")
+                                    if (uri != null) {
+                                        val shareIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            type = "image/png"
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song QR Code"))
+                                    }
+                                }
+                                onDismiss()
+                            }
+                        }
+                        .padding(vertical = 8.dp),
+                    fontSize = 16.sp
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
