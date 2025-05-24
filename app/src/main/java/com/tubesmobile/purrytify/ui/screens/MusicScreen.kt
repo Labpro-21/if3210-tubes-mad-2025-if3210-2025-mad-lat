@@ -1,6 +1,7 @@
 package com.tubesmobile.purrytify.ui.screens
 
 import android.content.ContentResolver
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -63,6 +64,7 @@ fun MusicScreen(
     val song = currentSong
     var showDeviceDialog by remember { mutableStateOf(false) }
     var speakerIconPosition by remember { mutableStateOf(Offset(0f, 0f)) }
+    Log.d("kocokmeong", "currsong $song")
 
     val gradientColors = listOf(
         Color(0xFFBD1E01),
@@ -224,50 +226,74 @@ fun MusicScreen(
                     )
                 }
 
-                if (isFromApiSong) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_download),
-                        contentDescription = "Download",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                song?.let { currentSong ->
-                                    val songToSave = Song(
-                                        id = null,
-                                        title = currentSong.title,
-                                        artist = currentSong.artist,
-                                        duration = currentSong.duration,
-                                        uri = currentSong.uri,
-                                        artworkUri = currentSong.artworkUri
-                                    )
-                                    musicDbViewModel.checkAndInsertOnlineSong(
-                                        context,
-                                        songToSave,
-                                        onSuccess = { savedSong ->
-                                            scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
-                                        },
-                                        onError = { message ->
-                                            scope.launch { snackbarHostState.showSnackbar(message) }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isFromApiSong) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    song?.id?.let { songId ->
+                                        val shareUrl = "purrytify://song/$songId"
+                                        Log.d("kocokmeong", shareUrl)
+                                        val shareIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, shareUrl)
+                                            type = "text/plain"
                                         }
-                                    )
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song"))
+                                    }
                                 }
-                            }
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
-                        contentDescription = "Like",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                song?.let {
-                                    musicDbViewModel.toggleSongLike(it)
-                                    isLiked = !isLiked
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_download),
+                            contentDescription = "Download",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    song?.let { currentSong ->
+                                        val songToSave = Song(
+                                            id = null,
+                                            title = currentSong.title,
+                                            artist = currentSong.artist,
+                                            duration = currentSong.duration,
+                                            uri = currentSong.uri,
+                                            artworkUri = currentSong.artworkUri
+                                        )
+                                        musicDbViewModel.checkAndInsertOnlineSong(
+                                            context,
+                                            songToSave,
+                                            onSuccess = { savedSong ->
+                                                scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
+                                            },
+                                            onError = { message ->
+                                                scope.launch { snackbarHostState.showSnackbar(message) }
+                                            }
+                                        )
+                                    }
                                 }
-                            }
-                    )
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
+                            contentDescription = "Like",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    song?.let {
+                                        musicDbViewModel.toggleSongLike(it)
+                                        isLiked = !isLiked
+                                    }
+                                }
+                        )
+                    }
                 }
             }
 
