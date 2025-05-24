@@ -103,7 +103,43 @@ class MusicBehaviorViewModel : ViewModel() {
         }
     }
 
+    private fun startMonitoringAudioOutput(context: Context) {
+        viewModelScope.launch {
+            while (true) {
+                val newDevice = getCurrentRoutedDevice(context)
+                if (newDevice != null && newDevice != _currentAudioDevice.value) {
+                    _currentAudioDevice.value = newDevice
+                    Log.d("AudioRouting", "Detected audio switch to: ${newDevice.name}")
+                }
+                delay(3000)
+            }
+        }
+    }
+
+    private fun getCurrentRoutedDevice(context: Context): AudioDevice? {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val routedDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val selected = routedDevices.find {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                    it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+        }
+        return if (selected != null) {
+            AudioDevice(
+                name = selected.productName?.toString() ?: "Bluetooth Device",
+                id = selected.id,
+                type = selected.type,
+                isConnected = true
+            )
+        } else {
+            AudioDevice("Internal Speaker", -1, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, true)
+        }
+    }
+
+
+
     fun initializeAudioRouting(context: Context) {
+        startMonitoringAudioOutput(context)
         Log.d("MusicBehaviorViewModel", "initializeAudioRouting: isEmulator=$isEmulator")
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         if (isEmulator) {
@@ -180,10 +216,14 @@ class MusicBehaviorViewModel : ViewModel() {
         }
 
         _audioDevices.value = devices
-        if (_currentAudioDevice.value == null) {
-            _currentAudioDevice.value = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-        }
-        Log.d("MusicBehaviorViewModel", "updateAudioDevices: devices=${_audioDevices.value}")
+
+        val preferredId = mediaPlayer?.preferredDevice?.id
+        val matchingDevice = devices.find { it.id == preferredId }
+
+        _currentAudioDevice.value = matchingDevice ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+
+        Log.d("MusicBehaviorViewModel", "updateAudioDevices: current=${_currentAudioDevice.value?.name}")
+
     }
 
     fun selectAudioDevice(device: AudioDevice, context: Context) {
@@ -194,6 +234,7 @@ class MusicBehaviorViewModel : ViewModel() {
         try {
             if (device.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
                 setAudioOutputToSpeaker(context)
+                return
             } else {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
@@ -220,9 +261,16 @@ class MusicBehaviorViewModel : ViewModel() {
     private fun setAudioOutputToSpeaker(context: Context) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         try {
-            mediaPlayer?.setPreferredDevice(null) // Reset to default (speaker)
-            _currentAudioDevice.value = _audioDevices.value.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+            // Set MediaPlayer to use system default (no preferred device)
+            mediaPlayer?.setPreferredDevice(null)
+
+            // Force output to speaker
             audioManager.isSpeakerphoneOn = true
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION // <-- penting untuk override A2DP
+            audioManager.stopBluetoothSco()
+            audioManager.isBluetoothScoOn = false
+
+            _currentAudioDevice.value = _audioDevices.value.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
         } catch (e: Exception) {
             _audioError.value = "Error setting speaker output: ${e.message}"
         }

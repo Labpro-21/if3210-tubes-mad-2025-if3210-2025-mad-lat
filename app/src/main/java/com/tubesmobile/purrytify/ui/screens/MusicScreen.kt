@@ -77,6 +77,10 @@ fun MusicScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        musicBehaviorViewModel.initializeAudioRouting(context)
+    }
+
     LaunchedEffect(audioError) {
         audioError?.let { error ->
             scope.launch {
