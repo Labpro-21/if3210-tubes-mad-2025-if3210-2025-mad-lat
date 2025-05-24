@@ -59,11 +59,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-// import com.google.android.libraries.places.api.model.Place // For Google Places
-// import com.google.android.libraries.places.widget.Autocomplete // For Google Places
-// import com.google.android.libraries.places.widget.model.AutocompleteActivityMode // For Google Places
-import androidx.compose.material.icons.outlined.PhotoLibrary // For Gallery
-import androidx.compose.material.icons.outlined.PhotoCamera  // For Camera
+import android.location.Address
+import android.location.Geocoder
+import android.os.Build
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import java.io.IOException
+import java.util.Locale
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Edit
 
@@ -202,13 +208,15 @@ fun SwipeableProfileEditDialog(
     var selectedProfilePhotoUri by remember { mutableStateOf<Uri?>(null) }
     var displayedProfilePhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.toPx() }
     val keyboardController = LocalSoftwareKeyboardController.current
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    val context = LocalContext.current
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var cameraImageUriForPhoto by remember { mutableStateOf<Uri?>(null) }
     var actualCameraOutputFile by remember { mutableStateOf<File?>(null) }
@@ -320,13 +328,94 @@ fun SwipeableProfileEditDialog(
         val coarseLocationGranted = permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
 
         if (fineLocationGranted || coarseLocationGranted) {
-            // Log.i("ProfileEditDialog", "Location permission granted. Implement location fetching.")
-            // TODO: Implement FusedLocationProviderClient logic to get current location,
-            //  then use Geocoder to get country code from LatLng.
-            errorMessage = "Auto-detect location: Location fetching and Geocoding needed."
-            showErrorDialog = true
+            Log.i("ProfileEditDialog", "Location permission granted. Fetching current location...")
+
+            // Double-check permission for lint and safety before making the call
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+                    .addOnSuccessListener { loc: android.location.Location? ->
+                        if (loc != null) {
+                            Log.d("ProfileEditDialog", "Location fetched: Lat ${loc.latitude}, Lon ${loc.longitude}")
+                            try {
+                                val geocoder = Geocoder(context, Locale.getDefault())
+
+                                // Use modern API for Android 13 and above
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    geocoder.getFromLocation(loc.latitude, loc.longitude, 1, object : Geocoder.GeocodeListener {
+                                        override fun onGeocode(addresses: MutableList<Address>) {
+                                            if (addresses.isNotEmpty()) {
+                                                val countryCode = addresses[0].countryCode // ISO 3166-1 alpha-2
+                                                if (!countryCode.isNullOrEmpty()) {
+                                                    location = countryCode.uppercase()
+                                                    Log.i("ProfileEditDialog", "Country code (API 33+): $countryCode")
+                                                } else {
+                                                    Log.w("ProfileEditDialog", "Country code not found in address (API 33+).")
+                                                    errorMessage = "Could not determine country code from current location."
+                                                    showErrorDialog = true
+                                                }
+                                            } else {
+                                                Log.w("ProfileEditDialog", "No address found for the current location (API 33+).")
+                                                errorMessage = "Could not find address details for current location."
+                                                showErrorDialog = true
+                                            }
+                                        }
+
+                                        override fun onError(errorMsgFromGeocoder: String?) {
+                                            super.onError(errorMsgFromGeocoder)
+                                            Log.e("ProfileEditDialog", "Geocoder error (API 33+): $errorMsgFromGeocoder")
+                                            errorMessage = "Geocoder service error: ${errorMsgFromGeocoder ?: "Unknown geocoder error"}"
+                                            showErrorDialog = true
+                                        }
+                                    })
+                                } else { // For versions older than Android 13
+                                    @Suppress("DEPRECATION")
+                                    val addresses: List<Address>? = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
+                                    if (!addresses.isNullOrEmpty()) {
+                                        val countryCode = addresses[0].countryCode
+                                        if (!countryCode.isNullOrEmpty()) {
+                                            location = countryCode.uppercase()
+                                            Log.i("ProfileEditDialog", "Country code (pre-API 33): $countryCode")
+                                        } else {
+                                            Log.w("ProfileEditDialog", "Country code not found in address (pre-API 33).")
+                                            errorMessage = "Could not determine country code from current location."
+                                            showErrorDialog = true
+                                        }
+                                    } else {
+                                        Log.w("ProfileEditDialog", "No address found for the current location (pre-API 33).")
+                                        errorMessage = "Could not find address details for current location."
+                                        showErrorDialog = true
+                                    }
+                                }
+                            } catch (e: IOException) { // Geocoder can throw IOException
+                                Log.e("ProfileEditDialog", "Geocoder IOException (likely network or service unavailable)", e)
+                                errorMessage = "Unable to connect to Geocoder service. Check network."
+                                showErrorDialog = true
+                            } catch (e: IllegalArgumentException) {
+                                Log.e("ProfileEditDialog", "Geocoder IllegalArgumentException (invalid lat/lon)", e)
+                                errorMessage = "Invalid coordinates for geocoding."
+                                showErrorDialog = true
+                            }
+                        } else {
+                            Log.w("ProfileEditDialog", "FusedLocationProviderClient.getCurrentLocation returned null.")
+                            errorMessage = "Could not get current location. Please ensure GPS/Location Services are enabled and try again."
+                            showErrorDialog = true
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ProfileEditDialog", "FusedLocationProviderClient.getCurrentLocation task failed", e)
+                        errorMessage = "Failed to get location: ${e.localizedMessage ?: "Unknown error"}"
+                        showErrorDialog = true
+                    }
+            } else {
+                Log.w("ProfileEditDialog", "Location permission check failed immediately after launcher callback.")
+                errorMessage = "Location permission error. Please try again."
+                showErrorDialog = true
+            }
         } else {
-            errorMessage = "Location permission denied for auto-detection."
+            Log.w("ProfileEditDialog", "Location permission denied by user.")
+            errorMessage = "Location permission denied. Cannot auto-detect location."
             showErrorDialog = true
         }
     }
