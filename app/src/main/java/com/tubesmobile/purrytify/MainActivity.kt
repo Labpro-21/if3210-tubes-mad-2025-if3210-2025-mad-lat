@@ -5,16 +5,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.runtime.LaunchedEffect
 import android.os.Bundle
 import android.util.Log
-import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -30,6 +31,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.zxing.integration.android.IntentIntegrator
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.service.PermissionManager
 import com.tubesmobile.purrytify.service.TokenVerificationService
@@ -46,6 +48,7 @@ import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 
@@ -55,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private val networkViewModel by viewModels<NetworkViewModel>()
     private val loginViewModel by viewModels<LoginViewModel>()
     private val onlineSongsViewModel by viewModels<OnlineSongsViewModel>()
+    private val qrScanViewModel by viewModels<QrScanViewModel>()
     private lateinit var tokenManager: TokenManager
 
     private val tokenReceiver = object : BroadcastReceiver() {
@@ -135,6 +139,7 @@ class MainActivity : ComponentActivity() {
                         isLoggedIn = tokenManager.getToken() != null,
                         musicDbViewModel = musicDbViewModel,
                         onlineSongsViewModel = onlineSongsViewModel,
+                        qrScanViewModel = qrScanViewModel,
                         deepLinkIntent = intent
                     )
                 }
@@ -147,6 +152,19 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         handleDeepLink(intent)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Log.d("MainActivity", "onActivityResult: requestCode=$requestCode, resultCode=$resultCode, data=$data")
+        val scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
+        if (scanResult != null && scanResult.contents != null) {
+            Log.d("MainActivity", "QR scan result: ${scanResult.contents}")
+            qrScanViewModel.setScanResult(scanResult.contents)
+        } else {
+            Log.w("MainActivity", "No QR scan result or contents found")
+            qrScanViewModel.setScanResult(null)
+        }
     }
 
     private fun handleDeepLink(intent: Intent?) {
@@ -243,6 +261,7 @@ fun PurrytifyNavHost(
     loginViewModel: LoginViewModel,
     isLoggedIn: Boolean,
     onlineSongsViewModel: OnlineSongsViewModel,
+    qrScanViewModel: QrScanViewModel,
     deepLinkIntent: Intent?
 ) {
     val navController = rememberNavController()
@@ -275,7 +294,8 @@ fun PurrytifyNavHost(
             HomeScreen(
                 navController = navController,
                 musicBehaviorViewModel = musicBehaviorViewModel,
-                loginViewModel = loginViewModel
+                loginViewModel = loginViewModel,
+                qrScanViewModel = qrScanViewModel
             )
         }
         composable("library") {

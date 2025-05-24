@@ -72,6 +72,7 @@ fun MusicScreen(
     val song = currentSong
 
     LaunchedEffect(songId, song) {
+        Log.d("homescreen kocok", "id nya yg lagi main $songId")
         if (songId != -1 && song?.id != songId) {
             onlineSongsViewModel.loadSongById(songId) { apiSong ->
                 if (apiSong != null) {
@@ -512,74 +513,6 @@ fun DeviceDialog(
         }
     }
 }
-
-//@Composable
-//fun ShareDialog(
-//    songId: Int?,
-//    context: Context,
-//    onDismiss: () -> Unit
-//) {
-//    AlertDialog(
-//        onDismissRequest = onDismiss,
-//        title = { Text("Share Song") },
-//        text = {
-//            Column {
-//                Text(
-//                    text = "Share as URL",
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .clickable {
-//                            songId?.let { id ->
-//                                val shareUrl = "purrytify://song/$id"
-//                                Log.d("kocokmeong", shareUrl)
-//                                val shareIntent = Intent().apply {
-//                                    action = Intent.ACTION_SEND
-//                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
-//                                    type = "text/plain"
-//                                }
-//                                context.startActivity(Intent.createChooser(shareIntent, "Share Song URL"))
-//                            }
-//                            onDismiss()
-//                        }
-//                        .padding(vertical = 8.dp),
-//                    fontSize = 16.sp
-//                )
-//                Text(
-//                    text = "Share as QR Code",
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .clickable {
-//                            songId?.let { id ->
-//                                val shareUrl = "purrytify://song/$id"
-//                                val qrBitmap = generateQRCode(shareUrl, 512, 512)
-//                                if (qrBitmap != null) {
-//                                    val uri = saveBitmapToCache(context, qrBitmap, "song_qr_$id.png")
-//                                    if (uri != null) {
-//                                        val shareIntent = Intent().apply {
-//                                            action = Intent.ACTION_SEND
-//                                            putExtra(Intent.EXTRA_STREAM, uri)
-//                                            type = "image/png"
-//                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-//                                        }
-//                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song QR Code"))
-//                                    }
-//                                }
-//                                onDismiss()
-//                            }
-//                        }
-//                        .padding(vertical = 8.dp),
-//                    fontSize = 16.sp
-//                )
-//            }
-//        },
-//        confirmButton = {},
-//        dismissButton = {
-//            TextButton(onClick = onDismiss) {
-//                Text("Cancel")
-//            }
-//        }
-//    )
-//}
 
 private fun isValidUri(uri: Uri, contentResolver: ContentResolver): Boolean {
     return try {
