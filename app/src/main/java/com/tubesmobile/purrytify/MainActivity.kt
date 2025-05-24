@@ -38,6 +38,8 @@ import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlin.math.log
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
@@ -166,16 +168,24 @@ fun PurrytifyNavHost(
                 loginViewModel = loginViewModel,
                 musicBehaviorViewModel = musicBehaviorViewModel)
         }
-        composable("music/{sourceScreen}") {
-            val sourceScreen = it.arguments?.getString("sourceScreen")?.let { name ->
+        composable(
+            route = "music/{sourceScreen}/{isFromApiSong}",
+            arguments = listOf(
+                navArgument("sourceScreen") { type = NavType.StringType },
+                navArgument("isFromApiSong") { type = NavType.BoolType }
+            )
+        ) { backStackEntry ->
+            val sourceScreen = backStackEntry.arguments?.getString("sourceScreen")?.let { name ->
                 Screen.valueOf(name)
             } ?: Screen.HOME
+            val isFromApiSong = backStackEntry.arguments?.getBoolean("isFromApiSong") ?: false
 
             MusicScreen(
                 navController = navController,
                 sourceScreen = sourceScreen,
                 musicBehaviorViewModel = musicBehaviorViewModel,
-                musicDbViewModel = musicDbViewModel
+                musicDbViewModel = musicDbViewModel,
+                isFromApiSong = isFromApiSong
             )
         }
     }

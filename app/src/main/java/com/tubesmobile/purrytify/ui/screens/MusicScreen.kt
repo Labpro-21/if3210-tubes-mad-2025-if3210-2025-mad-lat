@@ -38,7 +38,8 @@ fun MusicScreen(
     navController: NavHostController,
     sourceScreen: Screen,
     musicBehaviorViewModel: MusicBehaviorViewModel,
-    musicDbViewModel: MusicDbViewModel
+    musicDbViewModel: MusicDbViewModel,
+    isFromApiSong: Boolean = false
 ) {
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
@@ -198,20 +199,44 @@ fun MusicScreen(
                     )
                 }
 
-                Icon(
-                    painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
-                    contentDescription = "Like",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable {
-                            song?.let {
-                                musicDbViewModel.toggleSongLike(it)
-                                isLiked = !isLiked
+                if (isFromApiSong) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_download),
+                        contentDescription = "Download",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                song?.let { currentSong ->
+                                    val songToSave = Song(
+                                        title = currentSong.title,
+                                        artist = currentSong.artist,
+                                        duration = currentSong.duration,
+                                        uri = currentSong.uri,
+                                        artworkUri = currentSong.artworkUri
+                                    )
+                                    // TODO: mekanisme nyimpan
+//                                    musicDbViewModel.insertSong(songToSave)
+                                }
                             }
-                        }
-                )
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
+                        contentDescription = "Like",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                song?.let {
+                                    musicDbViewModel.toggleSongLike(it)
+                                    isLiked = !isLiked
+                                }
+                            }
+                    )
+                }
             }
+
 
             Column(
                 modifier = Modifier
