@@ -15,21 +15,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
+import com.tubesmobile.purrytify.ui.viewmodel.AudioDevice
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlinx.coroutines.launch
@@ -49,11 +55,14 @@ fun MusicScreen(
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
     val duration by musicBehaviorViewModel.duration.collectAsState()
-    val currentAudioDevice by musicBehaviorViewModel.currentAudioDevice.collectAsState()
     val audioError by musicBehaviorViewModel.audioError.collectAsState()
+    val audioDevices by musicBehaviorViewModel.audioDevices.collectAsState()
+    val currentAudioDevice by musicBehaviorViewModel.currentAudioDevice.collectAsState()
     var isLiked by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val song = currentSong
+    var showDeviceDialog by remember { mutableStateOf(false) }
+    var speakerIconPosition by remember { mutableStateOf(Offset(0f, 0f)) }
 
     val gradientColors = listOf(
         Color(0xFFBD1E01),
@@ -75,10 +84,6 @@ fun MusicScreen(
                 musicBehaviorViewModel.clearAudioError()
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        musicBehaviorViewModel.initializeAudioRouting(context)
     }
 
     Scaffold(
@@ -345,28 +350,111 @@ fun MusicScreen(
                         }
                 )
 
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_add),
-                    contentDescription = "Select Audio Output",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clickable {
-                            navController.navigate("audioDeviceSelection")
-                        }
-                )
+                Box {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_add),
+                        contentDescription = "Select Audio Output",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { showDeviceDialog = true }
+                            .onGloballyPositioned { coordinates ->
+                                speakerIconPosition = coordinates.positionInRoot()
+                                Log.d("MusicScreen", "Speaker icon position: $speakerIconPosition")
+                            }
+                    )
+                    if (showDeviceDialog) {
+                        DeviceDialog(
+                            devices = audioDevices,
+                            currentDevice = currentAudioDevice,
+                            iconPosition = speakerIconPosition,
+                            onDeviceSelected = { device ->
+                                musicBehaviorViewModel.selectAudioDevice(device, context)
+                                showDeviceDialog = false
+                            },
+                            onDismiss = { showDeviceDialog = false }
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
-                text = "Playing on: ${currentAudioDevice?.name ?: "None"}",
-                color = Color.White.copy(alpha = 0.8f),
+                text = "Playing on ${currentAudioDevice?.name ?: "Internal Speaker"}",
+                color = Color.White.copy(alpha = 0.6f),
                 fontSize = 14.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
             Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun DeviceDialog(
+    devices: List<AudioDevice>,
+    currentDevice: AudioDevice?,
+    iconPosition: Offset,
+    onDeviceSelected: (AudioDevice) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val density = LocalDensity.current
+    val dialogWidth = 180.dp
+    val dialogHeight = if (devices.size <= 1) 48.dp else (devices.size * 36).dp
+    // Center the dialog above the icon
+    val offsetX = with(density) { iconPosition.x.toDp() - dialogWidth / 2 }
+    val offsetY = with(density) { iconPosition.y.toDp() - dialogHeight - 12.dp }
+
+    Popup(
+        onDismissRequest = onDismiss,
+        offset = androidx.compose.ui.unit.IntOffset(
+            x = with(density) { offsetX.roundToPx() },
+            y = with(density) { offsetY.roundToPx() }
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .width(dialogWidth)
+                .height(dialogHeight)
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (devices.size <= 1) {
+                    Text(
+                        text = "This Device",
+                        color = Color(0xFF00FF00),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                } else {
+                    devices.forEach { device ->
+                        Text(
+                            text = device.name,
+                            color = if (device == currentDevice) Color(0xFF00FF00) else Color.Black,
+                            fontSize = 14.sp,
+                            fontWeight = if (device == currentDevice) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onDeviceSelected(device)
+                                }
+                                .padding(vertical = 4.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }
