@@ -84,7 +84,7 @@ fun BottomPlayerBar(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable {
-                navController.navigate("music/${fromScreen.name}/$isFromApiSong")
+                navController.navigate("music/${fromScreen.name}/$isFromApiSong/-1")
             }
     ) {
         Row(

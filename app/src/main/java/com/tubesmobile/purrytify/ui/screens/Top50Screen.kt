@@ -221,7 +221,7 @@ fun Top50Screen(
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
                                     musicBehaviorViewModel.playSong(song, context)
-                                    navController.navigate("music/${Screen.HOME.name}/true")
+                                    navController.navigate("music/${Screen.HOME.name}/true/-1")
                                 }
                             )
                         }

@@ -4,8 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +39,7 @@ import com.tubesmobile.purrytify.ui.screens.LoginScreen
 import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
 import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
+import com.tubesmobile.purrytify.ui.screens.Song
 import com.tubesmobile.purrytify.ui.screens.Top50Screen
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
@@ -44,15 +47,16 @@ import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 
 class MainActivity : ComponentActivity() {
     private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
     private val musicDbViewModel by viewModels<MusicDbViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
     private val loginViewModel by viewModels<LoginViewModel>()
+    private val onlineSongsViewModel by viewModels<OnlineSongsViewModel>()
     private lateinit var tokenManager: TokenManager
 
-    // Token expiration receiver
     private val tokenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == TokenVerificationService.ACTION_LOGOUT) {
@@ -79,14 +83,11 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // Initialize TokenManager with error handling
-        var initializationError: String? = null
         try {
             tokenManager = TokenManager(applicationContext)
         } catch (e: Exception) {
             Log.e("MainActivity", "Failed to initialize TokenManager: ${e.message}", e)
             try {
-                // Clear corrupted SharedPreferences and retry
                 applicationContext.getSharedPreferences("secure_prefs", Context.MODE_PRIVATE)
                     .edit()
                     .clear()
@@ -94,7 +95,12 @@ class MainActivity : ComponentActivity() {
                 tokenManager = TokenManager(applicationContext)
             } catch (retryException: Exception) {
                 Log.e("MainActivity", "Retry TokenManager initialization failed: ${retryException.message}", retryException)
-                initializationError = "Failed to initialize secure storage"
+                setContent {
+                    PurrytifyTheme {
+                        ErrorScreen(errorMessage = "Failed to initialize secure storage")
+                    }
+                }
+                return
             }
         }
 
@@ -102,7 +108,6 @@ class MainActivity : ComponentActivity() {
             PermissionManager.requestAudioPermission(this)
         }
 
-        // Register for token expiration broadcasts
         try {
             LocalBroadcastManager.getInstance(this).registerReceiver(
                 tokenReceiver,
@@ -112,7 +117,6 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Error registering token receiver: ${e.message}", e)
         }
 
-        // Start TokenVerificationService
         try {
             startService(Intent(this, TokenVerificationService::class.java))
         } catch (e: Exception) {
@@ -125,16 +129,47 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalNetworkStatus provides networkViewModel.isConnected
                 ) {
-                    // Handle initialization error
-                    if (initializationError != null) {
-                        ErrorScreen(errorMessage = initializationError)
-                    } else {
-                        PurrytifyNavHost(
-                            musicBehaviorViewModel = musicBehaviorViewModel,
-                            loginViewModel = loginViewModel,
-                            isLoggedIn = tokenManager.getToken() != null,
-                            musicDbViewModel = musicDbViewModel
-                        )
+                    PurrytifyNavHost(
+                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        loginViewModel = loginViewModel,
+                        isLoggedIn = tokenManager.getToken() != null,
+                        musicDbViewModel = musicDbViewModel,
+                        onlineSongsViewModel = onlineSongsViewModel,
+                        deepLinkIntent = intent
+                    )
+                }
+            }
+        }
+
+        handleDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (uri.scheme == "purrytify" && uri.host == "song") {
+                val songId = uri.pathSegments.firstOrNull()?.toIntOrNull()
+                if (songId != null) {
+                    Log.d("MainActivity", "Handling deep link for song ID: $songId")
+                    onlineSongsViewModel.loadSongById(songId) { song ->
+                        if (song != null) {
+                            val songData = Song(
+                                id = song.id,
+                                title = song.title,
+                                artist = song.artist,
+                                duration = parseDurationToMillis(song.duration),
+                                uri = song.url,
+                                artworkUri = song.artwork
+                            )
+                            musicBehaviorViewModel.playSong(songData, applicationContext)
+                            musicDbViewModel.updateSongTimestamp(songData)
+                        } else {
+                            Log.e("MainActivity", "Song with ID $songId not found")
+                        }
                     }
                 }
             }
@@ -206,15 +241,32 @@ fun PurrytifyNavHost(
     musicBehaviorViewModel: MusicBehaviorViewModel,
     musicDbViewModel: MusicDbViewModel,
     loginViewModel: LoginViewModel,
-    isLoggedIn: Boolean
+    isLoggedIn: Boolean,
+    onlineSongsViewModel: OnlineSongsViewModel,
+    deepLinkIntent: Intent?
 ) {
     val navController = rememberNavController()
+    val startDestination = if (isLoggedIn) "home" else "login"
 
     TokenExpirationHandler(navController)
 
+    LaunchedEffect(deepLinkIntent) {
+        deepLinkIntent?.data?.let { uri ->
+            if (uri.scheme == "purrytify" && uri.host == "song") {
+                val songId = uri.pathSegments.firstOrNull()?.toIntOrNull()
+                if (songId != null) {
+                    navController.navigate("music/${Screen.HOME.name}/true/$songId") {
+                        popUpTo(startDestination) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
-        startDestination = if (isLoggedIn) "home" else "login"
+        startDestination = startDestination
     ) {
         composable("login") {
             LoginScreen(navController = navController, loginViewModel = loginViewModel)
@@ -241,23 +293,30 @@ fun PurrytifyNavHost(
             )
         }
         composable(
-            route = "music/{sourceScreen}/{isFromApiSong}",
+            route = "music/{sourceScreen}/{isFromApiSong}/{songId}",
             arguments = listOf(
                 navArgument("sourceScreen") { type = NavType.StringType },
-                navArgument("isFromApiSong") { type = NavType.BoolType }
+                navArgument("isFromApiSong") { type = NavType.BoolType },
+                navArgument("songId") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                }
             )
         ) { backStackEntry ->
             val sourceScreen = backStackEntry.arguments?.getString("sourceScreen")?.let { name ->
                 Screen.valueOf(name)
             } ?: Screen.HOME
             val isFromApiSong = backStackEntry.arguments?.getBoolean("isFromApiSong") ?: false
+            val songId = backStackEntry.arguments?.getInt("songId") ?: -1
 
             MusicScreen(
                 navController = navController,
                 sourceScreen = sourceScreen,
                 musicBehaviorViewModel = musicBehaviorViewModel,
                 musicDbViewModel = musicDbViewModel,
-                isFromApiSong = isFromApiSong
+                isFromApiSong = isFromApiSong,
+                songId = songId,
+                onlineSongsViewModel = onlineSongsViewModel
             )
         }
         composable("top50/global") {
@@ -275,4 +334,11 @@ fun PurrytifyNavHost(
             )
         }
     }
+}
+
+private fun parseDurationToMillis(duration: String): Long {
+    val parts = duration.split(":")
+    val minutes = parts[0].toLongOrNull() ?: 0L
+    val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+    return (minutes * 60 + seconds) * 1000
 }
