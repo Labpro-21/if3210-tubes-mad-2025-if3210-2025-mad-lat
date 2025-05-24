@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,11 +21,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -37,8 +40,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.data.model.ApiSong
+import com.tubesmobile.purrytify.data.model.ProfileResponse
 import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
@@ -47,11 +52,14 @@ import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
+import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel.ProfileState
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 
 @Composable
 fun HomeScreen(
+    profileViewModel: ProfileViewModel = viewModel(),
     navController: NavHostController,
     musicBehaviorViewModel: MusicBehaviorViewModel,
     loginViewModel: LoginViewModel
@@ -71,6 +79,9 @@ fun HomeScreen(
     val songsError by musicDbViewModel.songsError.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
     val onlineSongsError by onlineSongsViewModel.error.collectAsState()
+    val profileState by profileViewModel.profile.collectAsState()
+    val baseUrl = "http://34.101.226.132:3000"
+    var dynamicProfilePhotoUrl by remember { mutableStateOf<String?>(null) }
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
@@ -84,6 +95,30 @@ fun HomeScreen(
             .filter { it.id in timestampMap }
             .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
             .take(5)
+    }
+
+    LaunchedEffect(key1 = isConnected, key2 = profileState) {
+        if (isConnected && profileState is ProfileState.Loading) {
+            Log.d("HomeScreen", "Attempting to load profile.")
+            profileViewModel.loadProfile()
+        }
+    }
+
+    LaunchedEffect(key1 = profileState) {
+        if (profileState is ProfileState.Success) {
+            val profile = (profileState as ProfileState.Success).profile
+            if (!profile.profilePhoto.isNullOrEmpty()) {
+                val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
+                dynamicProfilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
+                Log.d("HomeScreen", "Profile photo URL set: $dynamicProfilePhotoUrl")
+            } else {
+                dynamicProfilePhotoUrl = null
+                Log.d("HomeScreen", "No profile photo found in profile data.")
+            }
+        } else if (profileState is ProfileState.Error || profileState is ProfileState.SessionExpired) {
+            dynamicProfilePhotoUrl = null
+            Log.d("HomeScreen", "Profile loading error or session expired, clearing photo URL.")
+        }
     }
 
     Scaffold(
@@ -145,12 +180,21 @@ fun HomeScreen(
                         lineHeight = 36.sp
                     )
                 }
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Purrytify Logo",
+
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(dynamicProfilePhotoUrl)
+                        .crossfade(true)
+                        .placeholder(R.drawable.ic_launcher_foreground)
+                        .error(R.drawable.ic_launcher_foreground)
+                        .build(),
+                    contentDescription = "Profile Photo",
                     modifier = Modifier
-                        .size(80.dp)
-                        .padding(start = 16.dp)
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { navController.navigate("profile") },
+                    contentScale = ContentScale.Crop
                 )
             }
 
