@@ -86,6 +86,8 @@ fun HomeScreen(
             .sortedByDescending { timestampMap[it.id]?.lastPlayedTimestamp ?: 0L }
             .take(5)
     }
+    Log.d("kocokmeong", "recently played song $recentlyPlayedSongs")
+    Log.d("kocokmeong", "new song $newSongs")
 
     Scaffold(
         bottomBar = {
@@ -94,7 +96,8 @@ fun HomeScreen(
                     BottomPlayerBar(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         navController = navController,
-                        fromScreen = Screen.LIBRARY
+                        fromScreen = Screen.LIBRARY,
+                        isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
                     )
                 }
                 SharedBottomNavigationBar(
@@ -224,7 +227,7 @@ fun HomeScreen(
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
                                     musicBehaviorViewModel.playSong(song, context)
-                                    navController.navigate("music/${Screen.HOME.name}")
+                                    navController.navigate("music/${Screen.HOME.name}/true")
                                 }
                             )
                         }
@@ -265,7 +268,7 @@ fun HomeScreen(
                             onClick = { selectedSong ->
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 musicBehaviorViewModel.playSong(selectedSong, context)
-                                navController.navigate("music/${Screen.HOME.name}")
+                                navController.navigate("music/${Screen.HOME.name}/false")
                             },
                             musicBehaviorViewModel = musicBehaviorViewModel
                         )
@@ -308,7 +311,7 @@ fun HomeScreen(
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
-                                navController.navigate("music/${Screen.LIBRARY.name}")
+                                navController.navigate("music/${Screen.LIBRARY.name}/false")
                             },
                             musicBehaviorViewModel = musicBehaviorViewModel
                         )

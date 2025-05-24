@@ -96,7 +96,8 @@ fun MusicLibraryScreen(
                     BottomPlayerBar(
                         musicBehaviorViewModel = musicBehaviorViewModel,
                         navController = navController,
-                        fromScreen = Screen.HOME
+                        fromScreen = Screen.LIBRARY,
+                        isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
                     )
                 }
 
@@ -249,7 +250,7 @@ fun MusicLibraryScreen(
                                     musicBehaviorViewModel.playSong(selectedSong, context)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
-                                navController.navigate("music/${Screen.LIBRARY.name}")
+                                navController.navigate("music/${Screen.LIBRARY.name}/false")
                             },
                             onAddToQueue = { musicBehaviorViewModel.addToQueue(it) },
                             onEditRequest = {

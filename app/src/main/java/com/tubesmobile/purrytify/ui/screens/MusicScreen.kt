@@ -32,14 +32,19 @@ import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun MusicScreen(
     navController: NavHostController,
     sourceScreen: Screen,
     musicBehaviorViewModel: MusicBehaviorViewModel,
-    musicDbViewModel: MusicDbViewModel
+    musicDbViewModel: MusicDbViewModel,
+    isFromApiSong: Boolean = false
 ) {
+    var showPopup by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
     val position by musicBehaviorViewModel.currentPosition.collectAsState()
@@ -47,6 +52,7 @@ fun MusicScreen(
     var isLiked by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val song = currentSong
+    Log.d("kocokmeong", "lagu yg dimainin $song")
 
     val gradientColors = listOf(
         Color(0xFFBD1E01),
@@ -198,19 +204,51 @@ fun MusicScreen(
                     )
                 }
 
-                Icon(
-                    painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
-                    contentDescription = "Like",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable {
-                            song?.let {
-                                musicDbViewModel.toggleSongLike(it)
-                                isLiked = !isLiked
+                if (isFromApiSong) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_download),
+                        contentDescription = "Download",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                song?.let { currentSong ->
+                                    val songToSave = Song(
+                                        id = null,
+                                        title = currentSong.title,
+                                        artist = currentSong.artist,
+                                        duration = currentSong.duration,
+                                        uri = currentSong.uri,
+                                        artworkUri = currentSong.artworkUri
+                                    )
+                                    musicDbViewModel.checkAndInsertOnlineSong(
+                                        context,
+                                        songToSave,
+                                        onSuccess = { savedSong ->
+                                            scope.launch { snackbarHostState.showSnackbar("Song added successfully") }
+                                        },
+                                        onError = { message ->
+                                            scope.launch { snackbarHostState.showSnackbar(message) }
+                                        }
+                                    )
+                                }
                             }
-                        }
-                )
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = if (isLiked) R.drawable.ic_liked else R.drawable.ic_heart),
+                        contentDescription = "Like",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                song?.let {
+                                    musicDbViewModel.toggleSongLike(it)
+                                    isLiked = !isLiked
+                                }
+                            }
+                    )
+                }
             }
 
             Column(
