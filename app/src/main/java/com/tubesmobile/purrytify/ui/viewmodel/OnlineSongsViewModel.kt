@@ -66,7 +66,19 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
                     _onlineCountrySongs.value = response.body() ?: emptyList()
                     _error.value = null
                 } else {
-                    _error.value = "Failed to fetch country songs: ${response.message()}"
+                    if (response.code() == 401 || response.code() == 403) {
+                        _error.value = "Token expired. Attempting to refresh..."
+                        val refreshResult = tokenManager.refreshToken()
+                        if (refreshResult.isSuccess) {
+                            fetchOnlineCountrySongs(tokenManager) // Retry with new token
+                            return@launch
+                        } else {
+                            _error.value = "Token expired and refresh failed."
+                            tokenManager.clearTokens()
+                        }
+                    } else {
+                        _error.value = "Failed to fetch country songs: ${response.message()} (Code: ${response.code()})"
+                    }
                 }
             } catch (e: IOException) {
                 _error.value = "Network error: ${e.message}"
@@ -75,7 +87,9 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
             } catch (e: Exception) {
                 _error.value = "Unexpected error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                if (_error.value?.contains("Attempting to refresh...") != true) {
+                    _isLoading.value = false
+                }
             }
         }
     }
