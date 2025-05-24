@@ -19,8 +19,14 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: UserRepository
 
     init {
-        val tokenManager = TokenManager(application)
-        repository = UserRepository(RetrofitClient.apiService, tokenManager)
+        try {
+            val tokenManager = TokenManager(application)
+            repository = UserRepository(RetrofitClient.apiService, tokenManager)
+            Log.d("LoginViewModel", "TokenManager initialized successfully")
+        } catch (e: Exception) {
+            Log.e("LoginViewModel", "Failed to initialize TokenManager: ${e.message}", e)
+            throw IllegalStateException("Cannot initialize TokenManager", e)
+        }
     }
 
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
@@ -62,18 +68,23 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     LoginState.Error(errorMessage)
                 }
             } catch (e: Exception) {
+                Log.e("LoginViewModel", "Login error: ${e.message}", e)
                 _loginState.value = LoginState.Error(sanitizeText("Failed to connect to server"))
             }
         }
     }
 
     fun resetLoginState() {
-        _loginState.value = LoginState.Idle
-        _userEmail.value = null
-        _userName.value = null
-        DataKeeper.location = null
-        DataKeeper.email = null
-        DataKeeper.username = null
+        try {
+            _loginState.value = LoginState.Idle
+            _userEmail.value = null
+            _userName.value = null
+            DataKeeper.location = null
+            DataKeeper.email = null
+            DataKeeper.username = null
+        } catch (e: Exception) {
+            Log.e("LoginViewModel", "Error resetting login state: ${e.message}", e)
+        }
     }
 
     fun fetchUserEmail() {
@@ -93,14 +104,17 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     DataKeeper.location = profile.location
                     DataKeeper.email = _userEmail.value
                     DataKeeper.username = _userName.value
+                    Log.d("LoginViewModel", "User profile fetched successfully")
                 } else {
                     _userEmail.value = null
                     _userName.value = null
                     DataKeeper.location = null
                     DataKeeper.email = null
                     DataKeeper.username = null
+                    Log.w("LoginViewModel", "Failed to fetch profile: No data")
                 }
             } catch (e: Exception) {
+                Log.e("LoginViewModel", "Error fetching profile: ${e.message}", e)
                 _userEmail.value = null
                 _userName.value = null
                 DataKeeper.location = null
