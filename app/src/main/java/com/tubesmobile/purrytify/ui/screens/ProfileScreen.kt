@@ -1,6 +1,7 @@
 package com.tubesmobile.purrytify.ui.screens
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -203,6 +204,7 @@ fun ProfileContent(
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
     var expanded by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    val activity = LocalContext.current as? android.app.Activity
 
     var currentCapsuleIndex by remember { mutableStateOf(0) }
 
@@ -280,25 +282,25 @@ fun ProfileContent(
                 )
             }
             else if (currentCapsuleToDisplay != null) {
-                Row( // Month Navigation
+                Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
-                        enabled = currentCapsuleIndex > 0
-                    ) {
-                        Icon(Icons.Filled.ArrowBackIosNew, "Previous Month",
-                            tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
-                    }
-                    Text(currentCapsuleToDisplay.monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                    IconButton(
                         onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++ },
                         enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
                     ) {
-                        Icon(Icons.Filled.ArrowForwardIos, "Next Month",
+                        Icon(Icons.Filled.ArrowBackIosNew, "Next Month",
                             tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                    }
+                    Text(currentCapsuleToDisplay.monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    IconButton(
+                        onClick = {  if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
+                        enabled = currentCapsuleIndex > 0
+                    ) {
+                        Icon(Icons.Filled.ArrowForwardIos, "Previous Month",
+                            tint = if (currentCapsuleIndex > 0 ) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
                     }
                 }
 
@@ -322,7 +324,20 @@ fun ProfileContent(
                             navController.navigate("topSongsDetail")
                         }
                     },
-                    onShareClick = { /* TODO: Implement share */ },
+                    onShareClick = {
+                        if (currentCapsuleToDisplay.hasData && !soundCapsuleViewModel.isSharingImage.value) {
+                            if (activity != null) {
+                                soundCapsuleViewModel.shareCapsuleAsImage(
+                                    contextForActivity = activity,
+                                    capsuleData = currentCapsuleToDisplay
+                                )
+                            } else {
+                                Toast.makeText(context, "Cannot initiate share: Action requires an active screen.", Toast.LENGTH_LONG).show()
+                            }
+                        } else if (soundCapsuleViewModel.isSharingImage.value) {
+                            Toast.makeText(context, "Preparing image, please wait...", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     onDownloadClick = {
                         if (currentCapsuleToDisplay.hasData) {
                             val username = (profileState as? ProfileViewModel.ProfileState.Success)?.profile?.username ?: "User"
