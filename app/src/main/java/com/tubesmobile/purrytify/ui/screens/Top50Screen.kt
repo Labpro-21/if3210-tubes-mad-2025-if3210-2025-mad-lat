@@ -36,6 +36,7 @@ import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.data.model.ApiSong
 import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
+import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.service.MusicPlaybackService
@@ -44,6 +45,7 @@ import com.tubesmobile.purrytify.util.saveBitmapToCache
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import android.content.Intent
+import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +63,7 @@ fun Top50Screen(
     val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
     val onlineSongsError by onlineSongsViewModel.error.collectAsState()
+    val isConnected by LocalNetworkStatus.current.collectAsState()
 
     val songs = if (type == "global") onlineGlobalSongs else onlineCountrySongs
     val title = if (type == "global") "Top 50 Global" else "Top 10 ${DataKeeper.location}"
@@ -109,126 +112,134 @@ fun Top50Screen(
             }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
-                .padding(16.dp)
         ) {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                placeholder = {
+            if (!isConnected) {
+                NetworkOfflineScreen(24)
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
                     Text(
-                        text = "Search songs or artists",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        text = title,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search Icon",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        placeholder = {
+                            Text(
+                                text = "Search songs or artists",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear Search",
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search Icon",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { /* Handle search action if needed */ }),
-                shape = RoundedCornerShape(12.dp),
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    cursorColor = MaterialTheme.colorScheme.primary
-                )
-            )
-
-            when {
-                isLoadingOnlineSongs -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                onlineSongsError != null -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = onlineSongsError ?: "Error loading top songs",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-                filteredSongs.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (searchQuery.isEmpty()) "No top songs available" else "No songs found",
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filteredSongs) { apiSong ->
-                            TopSongItem(
-                                apiSong = apiSong,
-                                onClick = {
-                                    val song = Song(
-                                        id = apiSong.id,
-                                        title = apiSong.title,
-                                        artist = apiSong.artist,
-                                        duration = parseDurationToMillis(apiSong.duration),
-                                        uri = apiSong.url,
-                                        artworkUri = apiSong.artwork
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear Search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    musicDbViewModel.updateSongTimestamp(song)
-                                    musicService?.playSong(song, musicDbViewModel)
-                                    navController.navigate("music/${Screen.HOME.name}/true/-1")
                                 }
-                            )
+                            }
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { /* Handle search action if needed */ }),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    when {
+                        isLoadingOnlineSongs -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        onlineSongsError != null -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = onlineSongsError ?: "Error loading top songs",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        filteredSongs.isEmpty() -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (searchQuery.isEmpty()) "No top songs available" else "No songs found",
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredSongs) { apiSong ->
+                                    TopSongItem(
+                                        apiSong = apiSong,
+                                        onClick = {
+                                            val song = Song(
+                                                id = apiSong.id,
+                                                title = apiSong.title,
+                                                artist = apiSong.artist,
+                                                duration = parseDurationToMillis(apiSong.duration),
+                                                uri = apiSong.url,
+                                                artworkUri = apiSong.artwork
+                                            )
+                                            musicDbViewModel.updateSongTimestamp(song)
+                                            musicService?.playSong(song, musicDbViewModel, onlineSongsViewModel)
+                                            navController.navigate("music/${Screen.HOME.name}/true/-1")
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

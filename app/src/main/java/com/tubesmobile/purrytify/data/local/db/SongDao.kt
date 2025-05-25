@@ -11,6 +11,13 @@ import com.tubesmobile.purrytify.data.model.ArtistPlayStats
 import com.tubesmobile.purrytify.data.model.SongPlayStats
 import kotlinx.coroutines.flow.Flow
 
+import java.util.concurrent.TimeUnit
+
+data class DailyPlayDuration(
+    val dayOfMonth: Int,
+    val totalDurationMillis: Long
+)
+
 @Dao
 interface SongDao {
 
@@ -95,6 +102,12 @@ interface SongDao {
 
     // Song PLay Log
 
+    @Query("""
+        SELECT MIN(playedAtTimestamp) FROM song_play_log
+        WHERE userEmail = :userEmail AND isLocal = 1 AND playedAtTimestamp > 0 
+    """) // Added playedAtTimestamp > 0 to ignore faulty zero entries
+    fun getEarliestPlayLogTimestampForUser(userEmail: String): Flow<Long?>
+
     @Insert
     suspend fun insertSongPlayLog(playLog: SongPlayLogEntity): Long
 
@@ -140,4 +153,46 @@ interface SongDao {
     ORDER BY playCount DESC
     """)
     fun getTopSongsInMonthByPlayCount(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
+
+    @Query("""
+    SELECT s.artist, COUNT(DISTINCT spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration 
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail
+    AND spl.playedAtTimestamp >= :startTimeMillis
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY s.artist
+    ORDER BY totalDuration DESC 
+    """)
+    fun getTopArtistsInMonthByDuration(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<ArtistPlayStats>>
+
+    @Query("""
+    SELECT spl.songId, s.title, s.artist, s.artworkUri, s.uri as songUri, s.duration as songDuration,
+           COUNT(spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail
+    AND spl.playedAtTimestamp >= :startTimeMillis
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY spl.songId, s.title, s.artist, s.artworkUri, s.uri, s.duration
+    ORDER BY totalDuration DESC
+    """)
+    fun getTopSongsInMonthByDuration(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
+
+    @Query("""
+        SELECT 
+            CAST(strftime('%d', datetime(playedAtTimestamp / 1000, 'unixepoch', 'localtime')) AS INTEGER) as dayOfMonth, 
+            SUM(durationListenedMillis) as totalDurationMillis
+        FROM song_play_log
+        WHERE userEmail = :userEmail
+            AND playedAtTimestamp >= :startTimeMillis
+            AND playedAtTimestamp < :endTimeMillis
+            AND isLocal = 1
+            AND durationListenedMillis > 0 -- Hanya hitung jika ada durasi
+        GROUP BY dayOfMonth
+        ORDER BY dayOfMonth ASC
+    """)
+    suspend fun getDailyPlayDurationsInMonth(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): List<DailyPlayDuration>
 }

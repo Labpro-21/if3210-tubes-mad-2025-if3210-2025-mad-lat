@@ -57,7 +57,7 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
                     }
                 }
             } catch (e: IOException) {
-                _error.value = "Network error: ${e.message}"
+                _error.value = "Phone not connected to network"
             } catch (e: HttpException) {
                 _error.value = "HTTP error: ${e.message}"
             } catch (e: Exception) {
@@ -95,7 +95,7 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
                     }
                 }
             } catch (e: IOException) {
-                _error.value = "Network error: ${e.message}"
+                _error.value = "Phone not connected to network"
             } catch (e: HttpException) {
                 _error.value = "HTTP error: ${e.message}"
             } catch (e: Exception) {
