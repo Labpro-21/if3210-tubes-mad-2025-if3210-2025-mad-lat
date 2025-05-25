@@ -343,6 +343,15 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         return songDao.isSongLiked(sanitizeText(DataKeeper.email ?: ""), songId)
     }
 
+    suspend fun isSongExists(songId: Int): Boolean {
+        return try {
+            songDao.getSongById(songId) != null
+        } catch (e: Exception) {
+            Log.e("MusicDbViewModel", "Error checking song existence: ${e.message}")
+            false
+        }
+    }
+
     fun toggleSongLike(song: Song) {
         if (song.id == null || !isValidEmail(DataKeeper.email ?: "")) {
             return
