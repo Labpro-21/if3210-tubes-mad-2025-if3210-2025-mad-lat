@@ -8,9 +8,10 @@ import com.tubesmobile.purrytify.data.local.db.entities.SongUploader
 import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
 import androidx.room.Room
 import android.content.Context
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlayLogEntity
 import com.tubesmobile.purrytify.data.local.db.entities.SongPlayTimestamp
 
-@Database(entities = [SongEntity::class, LikedSongCrossRef::class, SongUploader::class, SongPlayTimestamp::class], version = 2)
+@Database(entities = [SongEntity::class, LikedSongCrossRef::class, SongUploader::class, SongPlayTimestamp::class, SongPlayLogEntity::class], version = 3)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
 

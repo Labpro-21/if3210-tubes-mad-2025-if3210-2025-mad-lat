@@ -30,10 +30,12 @@ import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.util.generateQRCode
 import com.tubesmobile.purrytify.util.saveBitmapToCache
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 
 @Composable
 fun BottomPlayerBar(
     musicService: MusicPlaybackService,
+    musicDbViewModel: MusicDbViewModel,
     navController: NavController,
     fromScreen: Screen,
     isFromApiSong: Boolean = false
@@ -171,7 +173,7 @@ fun BottomPlayerBar(
                 }
                 IconButton(
                     onClick = {
-                        musicService.togglePlayPause()
+                        musicService.togglePlayPause(musicDbViewModel)
                     }
                 ) {
                     Icon(

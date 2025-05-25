@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
 import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
 import com.tubesmobile.purrytify.data.local.db.entities.SongEntity
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlayLogEntity
 import com.tubesmobile.purrytify.data.local.db.entities.SongPlayTimestamp
 import com.tubesmobile.purrytify.data.local.db.entities.SongUploader
 import com.tubesmobile.purrytify.ui.screens.Song
@@ -471,5 +472,11 @@ class MusicDbViewModel(application: Application) : AndroidViewModel(application)
         val maxLength = 100
         val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "")
         return if (safeName.length > maxLength) safeName.substring(0, maxLength) else safeName
+    }
+
+    fun insertSongPlayLog(playLog: SongPlayLogEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            songDao.insertSongPlayLog(playLog)
+        }
     }
 }

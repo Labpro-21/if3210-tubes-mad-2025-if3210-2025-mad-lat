@@ -84,7 +84,7 @@ fun MusicScreen(
                         uri = apiSong.url,
                         artworkUri = apiSong.artwork
                     )
-                    musicService.playSong(song)
+                    musicService.playSong(song, musicDbViewModel)
                     musicDbViewModel.updateSongTimestamp(song)
                 } else {
                     scope.launch {
@@ -377,14 +377,14 @@ fun MusicScreen(
                     modifier = Modifier
                         .size(26.dp)
                         .clickable {
-                            musicService?.playPrevious()
+                            musicService?.playPrevious(musicDbViewModel)
                         }
                 )
 
                 Box(
                     modifier = Modifier
                         .size(84.dp)
-                        .clickable { musicService?.togglePlayPause() },
+                        .clickable { musicService?.togglePlayPause(musicDbViewModel) },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -402,7 +402,7 @@ fun MusicScreen(
                     modifier = Modifier
                         .size(26.dp)
                         .clickable {
-                            musicService?.playNext()
+                            musicService?.playNext(musicDbViewModel)
                         }
                 )
 

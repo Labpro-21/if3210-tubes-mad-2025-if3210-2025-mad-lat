@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
                             bindService(serviceIntent, object : ServiceConnection {
                                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                                     val binder = service as MusicPlaybackService.MusicPlaybackBinder
-                                    binder.getService().playSong(songData)
+                                    binder.getService().playSong(songData, musicDbViewModel)
                                     musicDbViewModel.updateSongTimestamp(songData)
                                     unbindService(this)
                                 }
@@ -370,7 +370,8 @@ fun PurrytifyNavHost(
             ProfileScreen(
                 navController = navController,
                 loginViewModel = loginViewModel,
-                musicService = musicService
+                musicService = musicService,
+                musicDbViewModel = musicDbViewModel
             )
         }
         composable("timeListenedDetail") {

@@ -127,6 +127,7 @@ fun MusicLibraryScreen(
                 if (currentSong != null && musicService != null) {
                     BottomPlayerBar(
                         musicService = musicService!!,
+                        musicDbViewModel = musicDbViewModel,
                         navController = navController,
                         fromScreen = Screen.LIBRARY,
                         isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
@@ -279,7 +280,7 @@ fun MusicLibraryScreen(
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
                                     musicService?.setPlaylist(songsToDisplay)
-                                    musicService?.playSong(selectedSong)
+                                    musicService?.playSong(selectedSong, musicDbViewModel)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
@@ -335,10 +336,10 @@ fun MusicLibraryScreen(
                         scope.launch { snackbarHostState.showSnackbar("${song.title} deleted") }
                         if (currentSong?.id == song.id && musicService != null) {
                             if (musicService!!.hasNextSong()) {
-                                musicService!!.playNext()
+                                musicService!!.playNext(musicDbViewModel)
                                 scope.launch { snackbarHostState.showSnackbar("Playing next song") }
                             } else {
-                                musicService!!.stopPlayback()
+                                musicService!!.stopPlayback(musicDbViewModel)
                                 scope.launch { snackbarHostState.showSnackbar("Playback stopped - song was deleted") }
                             }
                         }

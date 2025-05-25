@@ -16,7 +16,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlayLogEntity
 import com.tubesmobile.purrytify.ui.screens.Song
+import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -66,6 +68,9 @@ class MusicPlaybackService : Service() {
 
     private val _queue = mutableListOf<Song>()
     val queue: List<Song> get() = _queue
+
+    private var currentSongStartTimeMillis: Long = 0L
+    private val MIN_PLAY_DURATION_FOR_LOG_MS = 30000
 
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
@@ -336,7 +341,7 @@ class MusicPlaybackService : Service() {
         }
     }
 
-    fun playSong(song: Song) {
+    fun playSong(song: Song, musicDbViewModel: MusicDbViewModel) {
         if (!isValidSong(song)) {
             _audioError.value = "Invalid song data"
             return
@@ -348,7 +353,10 @@ class MusicPlaybackService : Service() {
             return
         }
 
+        logCurrentSongPlayDuration(musicDbViewModel)
+
         _currentSong.value = song
+        currentSongStartTimeMillis = System.currentTimeMillis()
         currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
@@ -361,6 +369,7 @@ class MusicPlaybackService : Service() {
                 }
                 prepareAsync()
                 setOnPreparedListener {
+                    logCurrentSongPlayDuration(musicDbViewModel, isCompletion = true)
                     start()
                     _duration.value = duration
                     _isPlaying.value = true
@@ -376,7 +385,7 @@ class MusicPlaybackService : Service() {
                     }
                 }
                 setOnCompletionListener {
-                    playNext()
+                    playNext(musicDbViewModel)
                 }
                 setOnErrorListener { _, what, extra ->
                     _isPlaying.value = false
@@ -394,13 +403,59 @@ class MusicPlaybackService : Service() {
         }
     }
 
-    fun togglePlayPause() {
+    private fun logCurrentSongPlayDuration(musicDbViewModel: MusicDbViewModel, isCompletion: Boolean = false) {
+        val songToLog = _currentSong.value
+        val mediaPlayerInstance = mediaPlayer
+
+        if (songToLog != null && songToLog.id != null && mediaPlayerInstance != null) { // song.id != null means it's a local DB song
+            val endTimeMillis = System.currentTimeMillis()
+            var listenedDurationMillis = 0L
+
+            try {
+                listenedDurationMillis = if (isCompletion) {
+                    (endTimeMillis - currentSongStartTimeMillis).coerceAtMost(songToLog.duration)
+                } else {
+                    (mediaPlayerInstance.currentPosition.toLong() - (currentSongStartTimeMillis - (endTimeMillis - mediaPlayerInstance.currentPosition.toLong()))).coerceAtLeast(0)
+                    (endTimeMillis - currentSongStartTimeMillis)
+                }
+                // Ensure listened duration isn't negative or excessively large
+                listenedDurationMillis = listenedDurationMillis.coerceIn(0, songToLog.duration)
+
+
+            } catch (e: IllegalStateException) {
+                // MediaPlayer might be in an invalid state
+                Log.e("MusicBehaviorVM", "Error getting current position for logging: ${e.message}")
+                listenedDurationMillis = endTimeMillis - currentSongStartTimeMillis // Fallback
+            }
+
+
+            if (listenedDurationMillis >= MIN_PLAY_DURATION_FOR_LOG_MS) {
+                val userEmail = DataKeeper.email ?: return // Should not be null
+                val playLog = SongPlayLogEntity(
+                    songId = songToLog.id,
+                    userEmail = userEmail,
+                    playedAtTimestamp = currentSongStartTimeMillis,
+                    durationListenedMillis = listenedDurationMillis,
+                    isLocal = true
+                )
+                musicDbViewModel.insertSongPlayLog(playLog)
+                Log.d("MusicBehaviorVM", "Logged play: ${songToLog.title}, Duration: $listenedDurationMillis ms")
+
+                musicDbViewModel.updateSongTimestamp(songToLog)
+            }
+        }
+        currentSongStartTimeMillis = 0L
+    }
+
+    fun togglePlayPause(musicDbViewModel: MusicDbViewModel) {
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) {
+                    logCurrentSongPlayDuration(musicDbViewModel)
                     it.pause()
                     _isPlaying.value = false
                 } else {
+                    currentSongStartTimeMillis = System.currentTimeMillis() - it.currentPosition
                     it.start()
                     _isPlaying.value = true
                 }
@@ -447,55 +502,57 @@ class MusicPlaybackService : Service() {
         _playlist.addAll(songs.filter { isValidSong(it) })
     }
 
-    fun playNext() {
+    fun playNext(musicDbViewModel: MusicDbViewModel) {
+        logCurrentSongPlayDuration(musicDbViewModel)
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
-            playSong(nextFromQueue)
+            playSong(nextFromQueue, musicDbViewModel)
         } else {
-            playNextFromPlaylist()
+            playNextFromPlaylist(musicDbViewModel)
         }
     }
 
-    private fun playNextFromPlaylist() {
+    private fun playNextFromPlaylist(musicDbViewModel: MusicDbViewModel) {
         val list = _playlist
         if (list.isEmpty()) return
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex])
+                    playSong(list[currentIndex], musicDbViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
-                playSong(list[currentIndex])
+                playSong(list[currentIndex], musicDbViewModel)
             }
         }
     }
 
-    fun playPrevious() {
+    fun playPrevious(musicDbViewModel: MusicDbViewModel) {
+        logCurrentSongPlayDuration(musicDbViewModel)
         val list = _playlist
         if (list.isEmpty()) return
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex])
+                    playSong(list[currentIndex], musicDbViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = if (currentIndex <= 0) list.size - 1 else currentIndex - 1
-                playSong(list[currentIndex])
+                playSong(list[currentIndex], musicDbViewModel)
             }
         }
     }
@@ -514,25 +571,26 @@ class MusicPlaybackService : Service() {
         }
     }
 
-    fun playNextFromQueue() {
+    fun playNextFromQueue(musicDbViewModel: MusicDbViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong)
+            playSong(nextSong, musicDbViewModel)
         } else {
-            playNext()
+            playNext(musicDbViewModel)
         }
     }
 
-    fun playOrQueueNext() {
+    fun playOrQueueNext(musicDbViewModel: MusicDbViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong)
+            playSong(nextSong, musicDbViewModel)
         } else {
-            playNext()
+            playNext(musicDbViewModel)
         }
     }
 
-    fun stopPlayback() {
+    fun stopPlayback(musicDbViewModel: MusicDbViewModel) {
+        logCurrentSongPlayDuration(musicDbViewModel)
         mediaPlayer?.apply {
             if (isPlaying) {
                 stop()

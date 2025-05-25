@@ -5,7 +5,10 @@ import android.util.Log
 import androidx.room.*
 import com.tubesmobile.purrytify.data.local.db.entities.SongEntity
 import com.tubesmobile.purrytify.data.local.db.entities.LikedSongCrossRef
+import com.tubesmobile.purrytify.data.local.db.entities.SongPlayLogEntity
 import com.tubesmobile.purrytify.data.local.db.entities.SongPlayTimestamp
+import com.tubesmobile.purrytify.data.model.ArtistPlayStats
+import com.tubesmobile.purrytify.data.model.SongPlayStats
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -89,4 +92,52 @@ interface SongDao {
 
     @Query("DELETE FROM songs WHERE id = :songId")
     suspend fun deleteSongById(songId: Int) // Delete the actual song if no users are left
+
+    // Song PLay Log
+
+    @Insert
+    suspend fun insertSongPlayLog(playLog: SongPlayLogEntity): Long
+
+    @Query("""
+    SELECT * FROM song_play_log
+    WHERE userEmail = :userEmail 
+    AND playedAtTimestamp >= :startTimeMillis 
+    AND playedAtTimestamp < :endTimeMillis
+    AND isLocal = 1 
+""")
+    fun getPlayLogsForUserInMonth(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayLogEntity>>
+
+    @Query("""
+    SELECT * FROM song_play_log
+    WHERE userEmail = :userEmail AND songId = :songId AND isLocal = 1
+    ORDER BY playedAtTimestamp ASC
+    """)
+    fun getPlayLogsForSongByUser(userEmail: String, songId: Int): Flow<List<SongPlayLogEntity>>
+
+    @Query("""
+    SELECT s.artist, COUNT(spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail 
+    AND spl.playedAtTimestamp >= :startTimeMillis 
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY s.artist
+    ORDER BY playCount DESC 
+    """)
+    fun getTopArtistsInMonthByPlayCount(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<ArtistPlayStats>>
+
+    @Query("""
+    SELECT spl.songId, s.title, s.artist, s.artworkUri, s.uri as songUri, s.duration as songDuration, 
+           COUNT(spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail 
+    AND spl.playedAtTimestamp >= :startTimeMillis 
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY spl.songId
+    ORDER BY playCount DESC
+    """)
+    fun getTopSongsInMonthByPlayCount(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
 }

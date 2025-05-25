@@ -56,17 +56,22 @@ import com.tubesmobile.purrytify.data.model.ArtistData
 import com.tubesmobile.purrytify.data.model.MonthlySoundCapsuleData
 import com.tubesmobile.purrytify.data.model.SongData
 import com.tubesmobile.purrytify.ui.components.MonthlySoundCapsuleCard
+import com.tubesmobile.purrytify.ui.viewmodel.SoundCapsuleViewModel
 
 @Composable
-fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicService: MusicPlaybackService?) {
+fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicService: MusicPlaybackService?, musicDbViewModel: MusicDbViewModel) {
     val currentScreen = remember { mutableStateOf(Screen.PROFILE) }
     val viewModel: ProfileViewModel = viewModel()
     val musicDbViewModel: MusicDbViewModel = viewModel()
+    val soundCapsuleViewModel: SoundCapsuleViewModel = viewModel()
     val profileState by viewModel.profile.collectAsState()
     val isConnected by LocalNetworkStatus.current.collectAsState()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
+
+    val monthlyCapsules by soundCapsuleViewModel.monthlyCapsules.collectAsState()
+    val isLoadingCapsules by soundCapsuleViewModel.isLoading.collectAsState()
 
     val newSongs = remember(songsList, songsTimestamp) {
         val timestampMap = songsTimestamp.associateBy { it.songId }
@@ -82,6 +87,12 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
     LaunchedEffect(key1 = Unit) {
         if (isConnected) {
             viewModel.loadProfile()
+        }
+    }
+
+    LaunchedEffect(DataKeeper.email) {
+        if (DataKeeper.email != null) {
+            soundCapsuleViewModel.loadSoundCapsuleData()
         }
     }
 
@@ -147,6 +158,8 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         profile = profile,
                         viewModel = viewModel,
                         navController = navController,
+                        monthlyCapsulesFromVM = monthlyCapsules,
+                        isLoadingCapsules = isLoadingCapsules,
                         onLogout = {
                             viewModel.logout()
                             loginViewModel.resetLoginState()
@@ -177,113 +190,55 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
 fun ProfileContent(
     profile: ProfileResponse,
     viewModel: ProfileViewModel,
-    navController: NavHostController, // Added NavController
+    navController: NavHostController,
+    monthlyCapsulesFromVM: List<MonthlySoundCapsuleData>,
+    isLoadingCapsules: Boolean,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
-    val baseUrl = "http://34.101.226.132:3000" // Consider moving to a config/constant file
+    val baseUrl = "http://34.101.226.132:3000"
     val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
     var expanded by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
 
-    // Dummy data for Monthly Sound Capsules
-    val soundCapsules = remember {
-        listOf(
-            MonthlySoundCapsuleData( // May 2025 - No data
-                monthYear = "May 2025",
-                timeListenedMinutes = null, dailyAverageMinutes = null,
-                topArtistName = null, topArtistImageUrl = null, totalArtistsListenedThisMonth = null, topArtistsList = null,
-                topSongName = null, topSongImageUrl = null, totalSongsPlayedThisMonth = null, topSongsList = null,
-                dayStreakCount = null, dayStreakSongName = null, dayStreakSongArtist = null, dayStreakFullText = null, dayStreakDateRange = null, dayStreakImage = null,
-                hasData = false
-            ),
-            MonthlySoundCapsuleData( // April 2025 - With data
-                monthYear = "April 2025",
-                timeListenedMinutes = 862,
-                dailyAverageMinutes = 33,
-                topArtistName = "The Beatles",
-                topArtistImageUrl = "https://e-cdns-images.dzcdn.net/images/artist/b290e6c703939503914620c25452a152/264x264-000000-80-0-0.jpg",
-                totalArtistsListenedThisMonth = 137,
-                topArtistsList = listOf(
-                    ArtistData(1, "Beatles", "https://e-cdns-images.dzcdn.net/images/artist/b290e6c703939503914620c25452a152/264x264-000000-80-0-0.jpg"),
-                    ArtistData(2, "The Weeknd", "https://i.scdn.co/image/ab676161000051748ae7f2aaa9817a704a87ea36"),
-                    ArtistData(3, "Kanye West", "https://i.scdn.co/image/ab67616100005174c0118f0a00a00aa761d5f507"),
-                    ArtistData(4, "Doechii", "https://i.scdn.co/image/ab67616100005174cf8a66352927a65606ccd6a4")
-                ),
-                topSongName = "Starboy",
-                topSongImageUrl = "https://i.scdn.co/image/ab67616d0000b273c05276696219639749f25088",
-                totalSongsPlayedThisMonth = 203,
-                topSongsList = listOf(
-                    SongData(1, "Starboy", "The Weeknd, Daft Punk", "https://i.scdn.co/image/ab67616d0000b273c05276696219639749f25088", 15),
-                    SongData(2, "Loose", "Daniel Caesar", "https://images.genius.com/6a8fac3cf1b03a233988398647661990.1000x1000x1.jpg", 12),
-                    SongData(3, "Nights", "Frank Ocean", "https://upload.wikimedia.org/wikipedia/en/a/a0/Blonde_-_Frank_Ocean.jpeg", 8),
-                    SongData(4, "Doomsday", "MF DOOM, Pebbles The Invisible Girl", "https://i.scdn.co/image/ab67616d0000b273daa5c409172d490928ea441a", 4)
-                ),
-                dayStreakCount = 5,
-                dayStreakSongName = "Loose",
-                dayStreakSongArtist = "Daniel Caesar",
-                dayStreakFullText = "You played Loose by Daniel Caesar day after day. You were on fire.",
-                dayStreakDateRange = "Mar 21-25, 2025",
-                dayStreakImage = "https://images.genius.com/6a8fac3cf1b03a233988398647661990.1000x1000x1.jpg", // Example image for streak
-                hasData = true
-            ),
-            MonthlySoundCapsuleData( // March 2025 - With data
-                monthYear = "March 2025",
-                timeListenedMinutes = 601,
-                dailyAverageMinutes = 25,
-                topArtistName = "Doechii",
-                topArtistImageUrl = "https://i.scdn.co/image/ab67616100005174cf8a66352927a65606ccd6a4",
-                totalArtistsListenedThisMonth = 105,
-                topArtistsList = listOf( /* ... add more artists ... */ ),
-                topSongName = "Nights",
-                topSongImageUrl = "https://upload.wikimedia.org/wikipedia/en/a/a0/Blonde_-_Frank_Ocean.jpeg",
-                totalSongsPlayedThisMonth = 150,
-                topSongsList = listOf( /* ... add more songs ... */ ),
-                dayStreakCount = 3,
-                dayStreakSongName = "Persuasive",
-                dayStreakSongArtist = "Doechii",
-                dayStreakFullText = "You vibed to Persuasive by Doechii for 3 days straight!",
-                dayStreakDateRange = "Mar 10-12, 2025",
-                dayStreakImage = "https://i.scdn.co/image/ab67616d0000b273103213779f756af07f16174c", // Example image
-                hasData = true
-            ),
-            MonthlySoundCapsuleData( // Feb 2025 - No data
-                monthYear = "February 2025",
-                timeListenedMinutes = null, dailyAverageMinutes = null,
-                topArtistName = null, topArtistImageUrl = null, totalArtistsListenedThisMonth = null, topArtistsList = null,
-                topSongName = null, topSongImageUrl = null, totalSongsPlayedThisMonth = null, topSongsList = null,
-                dayStreakCount = null, dayStreakSongName = null, dayStreakSongArtist = null, dayStreakFullText = null, dayStreakDateRange = null, dayStreakImage = null,
-                hasData = false
-            )
-        ).sortedByDescending { it.monthYear } // Ensure latest month is first or handle sorting as needed
+    var currentCapsuleIndex by remember { mutableStateOf(0) }
+
+    LaunchedEffect(monthlyCapsulesFromVM) {
+        if (monthlyCapsulesFromVM.isNotEmpty() && currentCapsuleIndex >= monthlyCapsulesFromVM.size) {
+            currentCapsuleIndex = 0
+        } else if (monthlyCapsulesFromVM.isEmpty()) {
+            currentCapsuleIndex = 0
+        }
     }
 
-    var currentCapsuleIndex by remember { mutableStateOf(0) }
-    val currentCapsule = soundCapsules[currentCapsuleIndex]
+    val currentCapsuleToDisplay = if (monthlyCapsulesFromVM.isNotEmpty() && currentCapsuleIndex < monthlyCapsulesFromVM.size) {
+        monthlyCapsulesFromVM[currentCapsuleIndex]
+    } else {
+        if (!isLoadingCapsules && monthlyCapsulesFromVM.isEmpty()) {
+            MonthlySoundCapsuleData(
+                monthYear = "No Data", hasData = false, timeListenedMinutes = null, dailyAverageMinutes = null, topArtistName = null, topArtistImageUrl = null, totalArtistsListenedThisMonth = null, topArtistsList = null, topSongName = null, topSongImageUrl = null, totalSongsPlayedThisMonth = null, topSongsList = null, dayStreakCount = null, dayStreakSongName = null, dayStreakSongArtist = null, dayStreakFullText = null, dayStreakDateRange = null, dayStreakImage = null
+            )
+        } else null
+    }
 
-    Box(modifier = Modifier.fillMaxSize()) { // For the MoreVert menu
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()) // Make the whole profile scrollable
+                .verticalScroll(rememberScrollState())
                 .background(MaterialTheme.colorScheme.background),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(50.dp)) // Space for status bar and top items
+            Spacer(modifier = Modifier.height(50.dp))
 
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(profilePhotoUrl)
-                    .crossfade(true)
-                    .placeholder(R.drawable.ic_launcher_foreground) // Your placeholder
-                    .error(R.drawable.ic_launcher_foreground)       // Your error placeholder
-                    .build(),
+                model = ImageRequest.Builder(context).data(profilePhotoUrl).crossfade(true)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground).build(),
                 contentDescription = "Profile Photo",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(100.dp) // Slightly smaller as per design
-                    .clip(CircleShape)
+                modifier = Modifier.size(100.dp).clip(CircleShape)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -294,115 +249,104 @@ fun ProfileContent(
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp), // More padding for stats
-                horizontalArrangement = Arrangement.SpaceAround // Or SpaceEvenly
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+                horizontalArrangement = Arrangement.SpaceAround
             ) {
                 StatItem("SONGS", DataKeeper.songsAmount.toString())
                 StatItem("LIKED", DataKeeper.likesAmount.toString())
-                StatItem("LISTENED", DataKeeper.listenedAmount.toString()) // This is overall, monthly is in capsule
+                StatItem("LISTENED", DataKeeper.listenedAmount.toString())
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Sound Capsule Section
             Text(
                 "Your Sound Capsule",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Month Navigation
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
-                    enabled = currentCapsuleIndex > 0
-                ) {
-                    Icon(
-                        Icons.Filled.ArrowBackIosNew,
-                        contentDescription = "Previous Month",
-                        tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                    )
-                }
+            if (isLoadingCapsules) {
+                CircularProgressIndicator(modifier = Modifier.padding(vertical = 20.dp))
+            } else if (monthlyCapsulesFromVM.isEmpty()) {
                 Text(
-                    currentCapsule.monthYear,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    "No sound capsule data available yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
                 )
-                IconButton(
-                    onClick = { if (currentCapsuleIndex < soundCapsules.size - 1) currentCapsuleIndex++ },
-                    enabled = currentCapsuleIndex < soundCapsules.size - 1
-                ) {
-                    Icon(
-                        Icons.Filled.ArrowForwardIos,
-                        contentDescription = "Next Month",
-                        tint = if (currentCapsuleIndex < soundCapsules.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                    )
-                }
             }
+            else if (currentCapsuleToDisplay != null) {
+                Row( // Month Navigation
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
+                        enabled = currentCapsuleIndex > 0
+                    ) {
+                        Icon(Icons.Filled.ArrowBackIosNew, "Previous Month",
+                            tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                    }
+                    Text(currentCapsuleToDisplay.monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    IconButton(
+                        onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++ },
+                        enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
+                    ) {
+                        Icon(Icons.Filled.ArrowForwardIos, "Next Month",
+                            tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                    }
+                }
 
-            // Display the current month's capsule
-            MonthlySoundCapsuleCard(
-                capsuleData = currentCapsule,
-                onTimeListenedClick = {
-                    // Store currentCapsule in a shared ViewModel or pass its ID/monthYear
-                    DataKeeper.currentSelectedCapsule = currentCapsule // Example of using DataKeeper
-                    navController.navigate("timeListenedDetail")
-                },
-                onTopArtistClick = {
-                    DataKeeper.currentSelectedCapsule = currentCapsule
-                    navController.navigate("topArtistsDetail")
-                },
-                onTopSongClick = {
-                    DataKeeper.currentSelectedCapsule = currentCapsule
-                    navController.navigate("topSongsDetail")
-                },
-                onShareClick = {
-                    // TODO: Implement share functionality
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp)) // Space at the bottom
+                MonthlySoundCapsuleCard(
+                    capsuleData = currentCapsuleToDisplay,
+                    onTimeListenedClick = {
+                        if (currentCapsuleToDisplay.hasData) {
+                            DataKeeper.currentSelectedCapsule = currentCapsuleToDisplay
+                            navController.navigate("timeListenedDetail")
+                        }
+                    },
+                    onTopArtistClick = {
+                        if (currentCapsuleToDisplay.hasData) {
+                            DataKeeper.currentSelectedCapsule = currentCapsuleToDisplay
+                            navController.navigate("topArtistsDetail")
+                        }
+                    },
+                    onTopSongClick = {
+                        if (currentCapsuleToDisplay.hasData) {
+                            DataKeeper.currentSelectedCapsule = currentCapsuleToDisplay
+                            navController.navigate("topSongsDetail")
+                        }
+                    },
+                    onShareClick = { /* TODO: Implement share */ },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            } else {
+                Text(
+                    "Sound capsule data is currently unavailable.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // MoreVert Menu (Top End)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 16.dp, end = 8.dp) // Adjusted padding
-        ) {
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 8.dp)) {
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(Icons.Default.MoreVert, "Menu", tint = MaterialTheme.colorScheme.onBackground)
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(
                     text = { Text("Edit Profile") },
                     leadingIcon = { Icon(Icons.Default.Edit, null) },
-                    onClick = {
-                        expanded = false
-                        showEditProfileDialog = true
-                    }
+                    onClick = { expanded = false; showEditProfileDialog = true }
                 )
                 DropdownMenuItem(
                     text = { Text("Logout", color = MaterialTheme.colorScheme.error) },
                     leadingIcon = { Icon(Icons.Default.ExitToApp, null, tint = MaterialTheme.colorScheme.error) },
-                    onClick = {
-                        expanded = false
-                        onLogout()
-                    }
+                    onClick = { expanded = false; onLogout() }
                 )
             }
         }
