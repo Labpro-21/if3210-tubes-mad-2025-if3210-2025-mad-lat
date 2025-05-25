@@ -27,21 +27,21 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.tubesmobile.purrytify.R
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.util.generateQRCode
 import com.tubesmobile.purrytify.util.saveBitmapToCache
 
 @Composable
 fun BottomPlayerBar(
-    musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicService: MusicPlaybackService,
     navController: NavController,
     fromScreen: Screen,
     isFromApiSong: Boolean = false
 ) {
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
-    val position by musicBehaviorViewModel.currentPosition.collectAsState()
-    val duration by musicBehaviorViewModel.duration.collectAsState()
+    val currentSong by musicService.currentSong.collectAsState()
+    val isPlaying by musicService.isPlaying.collectAsState()
+    val position by musicService.currentPosition.collectAsState()
+    val duration by musicService.duration.collectAsState()
     val song = currentSong
     val progress = if (duration > 0) position.toFloat() / duration else 0f
     val context = LocalContext.current
@@ -171,7 +171,7 @@ fun BottomPlayerBar(
                 }
                 IconButton(
                     onClick = {
-                        musicBehaviorViewModel.togglePlayPause()
+                        musicService.togglePlayPause()
                     }
                 ) {
                     Icon(

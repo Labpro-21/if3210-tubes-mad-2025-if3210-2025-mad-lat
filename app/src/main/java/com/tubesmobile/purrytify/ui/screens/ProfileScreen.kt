@@ -37,9 +37,9 @@ import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.ProfileData
 import com.tubesmobile.purrytify.ui.components.SwipeableProfileEditDialog
+import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import androidx.compose.foundation.pager.rememberPagerState
@@ -58,7 +58,7 @@ import com.tubesmobile.purrytify.data.model.SongData
 import com.tubesmobile.purrytify.ui.components.MonthlySoundCapsuleCard
 
 @Composable
-fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicBehaviorViewModel: MusicBehaviorViewModel) {
+fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewModel, musicService: MusicPlaybackService?) {
     val currentScreen = remember { mutableStateOf(Screen.PROFILE) }
     val viewModel: ProfileViewModel = viewModel()
     val musicDbViewModel: MusicDbViewModel = viewModel()
@@ -150,7 +150,7 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         onLogout = {
                             viewModel.logout()
                             loginViewModel.resetLoginState()
-                            musicBehaviorViewModel.onCleared()
+                            musicService?.onCleared()
                             navController.navigate("login") {
                                 popUpTo(0) { inclusive = true }
                             }
@@ -168,7 +168,6 @@ fun ProfileScreen(navController: NavHostController, loginViewModel: LoginViewMod
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
-
             }
         }
     }

@@ -1,24 +1,29 @@
 package com.tubesmobile.purrytify
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.net.Uri
-import androidx.compose.material3.Text
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.runtime.LaunchedEffect
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +36,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.navArgument
 import com.google.zxing.integration.android.IntentIntegrator
 import com.tubesmobile.purrytify.data.local.TokenManager
 import com.tubesmobile.purrytify.service.PermissionManager
@@ -43,24 +47,22 @@ import com.tubesmobile.purrytify.ui.screens.MusicLibraryScreen
 import com.tubesmobile.purrytify.ui.screens.MusicScreen
 import com.tubesmobile.purrytify.ui.screens.ProfileScreen
 import com.tubesmobile.purrytify.ui.screens.Song
+import com.tubesmobile.purrytify.ui.screens.TimeListenedScreen
 import com.tubesmobile.purrytify.ui.screens.Top50Screen
+import com.tubesmobile.purrytify.ui.screens.TopArtistsScreen
+import com.tubesmobile.purrytify.ui.screens.TopSongsScreen
+import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
-import android.app.Application
-import com.tubesmobile.purrytify.ui.screens.TimeListenedScreen
-import com.tubesmobile.purrytify.ui.screens.TopArtistsScreen
-import com.tubesmobile.purrytify.ui.screens.TopSongsScreen
-import org.osmdroid.config.Configuration
-import java.io.File // Added for File operations
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
+import org.osmdroid.config.Configuration
+import java.io.File
 
 class MainActivity : ComponentActivity() {
-    private val musicBehaviorViewModel by viewModels<MusicBehaviorViewModel>()
     private val musicDbViewModel by viewModels<MusicDbViewModel>()
     private val networkViewModel by viewModels<NetworkViewModel>()
     private val loginViewModel by viewModels<LoginViewModel>()
@@ -117,17 +119,12 @@ class MainActivity : ComponentActivity() {
 
         // --- OSMDroid Configuration ---
         val osmConfig = Configuration.getInstance()
-
-        // 1. Set a User Agent using context.packageName
         osmConfig.userAgentValue = applicationContext.packageName
-
-        // 2. Set base path for osmdroid's cache (app's cache directory is a good place)
         val osmBasePath = File(applicationContext.cacheDir, "osmdroid")
         osmConfig.osmdroidBasePath = osmBasePath
         val osmTileCache = File(osmConfig.osmdroidBasePath, "tiles")
         osmConfig.osmdroidTileCache = osmTileCache
 
-        // Ensure the directories exist
         if (!osmBasePath.exists()) osmBasePath.mkdirs()
         if (!osmTileCache.exists()) osmTileCache.mkdirs()
 
@@ -159,7 +156,6 @@ class MainActivity : ComponentActivity() {
                     LocalNetworkStatus provides networkViewModel.isConnected
                 ) {
                     PurrytifyNavHost(
-                        musicBehaviorViewModel = musicBehaviorViewModel,
                         loginViewModel = loginViewModel,
                         isLoggedIn = tokenManager.getToken() != null,
                         musicDbViewModel = musicDbViewModel,
@@ -208,8 +204,18 @@ class MainActivity : ComponentActivity() {
                                 uri = song.url,
                                 artworkUri = song.artwork
                             )
-                            musicBehaviorViewModel.playSong(songData, applicationContext)
-                            musicDbViewModel.updateSongTimestamp(songData)
+                            // Start the service and play the song after binding
+                            val serviceIntent = Intent(this, MusicPlaybackService::class.java)
+                            startService(serviceIntent)
+                            bindService(serviceIntent, object : ServiceConnection {
+                                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                                    val binder = service as MusicPlaybackService.MusicPlaybackBinder
+                                    binder.getService().playSong(songData)
+                                    musicDbViewModel.updateSongTimestamp(songData)
+                                    unbindService(this)
+                                }
+                                override fun onServiceDisconnected(name: ComponentName?) {}
+                            }, Context.BIND_AUTO_CREATE)
                         } else {
                             Log.e("MainActivity", "Song with ID $songId not found")
                         }
@@ -231,7 +237,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ErrorScreen(errorMessage: String) {
-    Text(
+    androidx.compose.material3.Text(
         text = "Error: $errorMessage",
         color = Color.Red,
         modifier = Modifier
@@ -281,16 +287,47 @@ fun TokenExpirationHandler(navController: NavHostController) {
 
 @Composable
 fun PurrytifyNavHost(
-    musicBehaviorViewModel: MusicBehaviorViewModel,
-    musicDbViewModel: MusicDbViewModel,
     loginViewModel: LoginViewModel,
     isLoggedIn: Boolean,
+    musicDbViewModel: MusicDbViewModel,
     onlineSongsViewModel: OnlineSongsViewModel,
     qrScanViewModel: QrScanViewModel,
     deepLinkIntent: Intent?
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
     val startDestination = if (isLoggedIn) "home" else "login"
+    var musicService by remember { mutableStateOf<MusicPlaybackService?>(null) }
+    var isBound by remember { mutableStateOf(false) }
+
+    val connection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as MusicPlaybackService.MusicPlaybackBinder
+                musicService = binder.getService()
+                isBound = true
+                musicService?.initializeAudioRouting()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                musicService = null
+                isBound = false
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val intent = Intent(context, MusicPlaybackService::class.java)
+        context.startService(intent)
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+
+        onDispose {
+            if (isBound) {
+                context.unbindService(connection)
+                isBound = false
+            }
+        }
+    }
 
     TokenExpirationHandler(navController)
 
@@ -318,7 +355,7 @@ fun PurrytifyNavHost(
         composable("home") {
             HomeScreen(
                 navController = navController,
-                musicBehaviorViewModel = musicBehaviorViewModel,
+                musicService = musicService,
                 loginViewModel = loginViewModel,
                 qrScanViewModel = qrScanViewModel
             )
@@ -326,7 +363,6 @@ fun PurrytifyNavHost(
         composable("library") {
             MusicLibraryScreen(
                 navController = navController,
-                musicBehaviorViewModel = musicBehaviorViewModel,
                 loginViewModel = loginViewModel
             )
         }
@@ -334,10 +370,9 @@ fun PurrytifyNavHost(
             ProfileScreen(
                 navController = navController,
                 loginViewModel = loginViewModel,
-                musicBehaviorViewModel = musicBehaviorViewModel
+                musicService = musicService
             )
         }
-
         composable("timeListenedDetail") {
             TimeListenedScreen(navController)
         }
@@ -347,7 +382,6 @@ fun PurrytifyNavHost(
         composable("topSongsDetail") {
             TopSongsScreen(navController)
         }
-
         composable(
             route = "music/{sourceScreen}/{isFromApiSong}/{songId}",
             arguments = listOf(
@@ -368,7 +402,7 @@ fun PurrytifyNavHost(
             MusicScreen(
                 navController = navController,
                 sourceScreen = sourceScreen,
-                musicBehaviorViewModel = musicBehaviorViewModel,
+                musicService = musicService,
                 musicDbViewModel = musicDbViewModel,
                 isFromApiSong = isFromApiSong,
                 songId = songId,
@@ -378,14 +412,14 @@ fun PurrytifyNavHost(
         composable("top50/global") {
             Top50Screen(
                 navController = navController,
-                musicBehaviorViewModel = musicBehaviorViewModel,
+                musicService = musicService,
                 type = "global"
             )
         }
         composable("top50/country") {
             Top50Screen(
                 navController = navController,
-                musicBehaviorViewModel = musicBehaviorViewModel,
+                musicService = musicService,
                 type = "country"
             )
         }

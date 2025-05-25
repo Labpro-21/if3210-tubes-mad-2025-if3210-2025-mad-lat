@@ -31,7 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.tubesmobile.purrytify.ui.viewmodel.AudioDevice
+import com.tubesmobile.purrytify.service.AudioDevice
 import kotlinx.coroutines.launch
 import android.media.AudioDeviceInfo
 

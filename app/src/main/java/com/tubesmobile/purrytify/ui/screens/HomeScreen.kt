@@ -48,16 +48,14 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.zxing.integration.android.IntentIntegrator
 import com.tubesmobile.purrytify.R
-import com.tubesmobile.purrytify.data.model.ApiSong
-import com.tubesmobile.purrytify.data.model.ProfileResponse
 import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
+import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel.ProfileState
@@ -68,7 +66,7 @@ import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 fun HomeScreen(
     profileViewModel: ProfileViewModel = viewModel(),
     navController: NavHostController,
-    musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicService: MusicPlaybackService?,
     loginViewModel: LoginViewModel,
     qrScanViewModel: QrScanViewModel = viewModel()
 ) {
@@ -80,7 +78,7 @@ fun HomeScreen(
     val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val songsTimestamp by musicDbViewModel.songsTimestamp.collectAsState(initial = emptyList())
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
     val onlineGlobalSongs by onlineSongsViewModel.onlineGlobalSongs.collectAsState()
     val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
     val isLoadingSongs by musicDbViewModel.isLoadingSongs.collectAsState()
@@ -199,9 +197,9 @@ fun HomeScreen(
     Scaffold(
         bottomBar = {
             Column {
-                if (currentSong != null) {
+                if (currentSong != null && musicService != null) {
                     BottomPlayerBar(
-                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        musicService = musicService,
                         navController = navController,
                         fromScreen = Screen.LIBRARY,
                         isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
@@ -426,10 +424,10 @@ fun HomeScreen(
                                 song = song,
                                 onClick = { selectedSong ->
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
-                                    musicBehaviorViewModel.playSong(selectedSong, context)
+                                    musicService?.playSong(selectedSong)
                                     navController.navigate("music/${Screen.HOME.name}/false/-1")
                                 },
-                                musicBehaviorViewModel = musicBehaviorViewModel
+                                musicService = musicService
                             )
                         }
                     }
@@ -495,12 +493,12 @@ fun HomeScreen(
                                 song = song,
                                 onClick = { selectedSong ->
                                     if (selectedSong.uri != currentSong?.uri) {
-                                        musicBehaviorViewModel.playSong(selectedSong, context)
+                                        musicService?.playSong(selectedSong)
                                     }
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
                                     navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
                                 },
-                                musicBehaviorViewModel = musicBehaviorViewModel
+                                musicService = musicService
                             )
                         }
                     }
@@ -558,8 +556,8 @@ private fun parseDurationToMillis(duration: String): Long {
 }
 
 @Composable
-fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: MusicBehaviorViewModel) {
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicService: MusicPlaybackService?) {
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
     Column(
         modifier = Modifier
             .width(80.dp)
@@ -631,8 +629,8 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: Mus
 }
 
 @Composable
-fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewModel: MusicBehaviorViewModel) {
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicService: MusicPlaybackService?) {
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
