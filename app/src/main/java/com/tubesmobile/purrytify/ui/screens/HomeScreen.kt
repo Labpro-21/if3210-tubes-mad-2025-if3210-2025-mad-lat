@@ -83,8 +83,6 @@ import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.text.style.TextOverflow
-import com.tubesmobile.purrytify.data.model.ApiSong
 import kotlinx.parcelize.Parcelize
 
 @Composable
