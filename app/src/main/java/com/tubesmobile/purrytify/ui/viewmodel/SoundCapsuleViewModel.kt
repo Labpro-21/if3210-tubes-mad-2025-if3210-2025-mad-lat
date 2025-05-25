@@ -3,8 +3,11 @@ package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -14,6 +17,8 @@ import com.tubesmobile.purrytify.data.model.MonthlySoundCapsuleData
 import com.tubesmobile.purrytify.data.model.SongData
 import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.util.PdfGenerator
+import com.tubesmobile.purrytify.ui.components.CapsuleShareView
+import com.tubesmobile.purrytify.util.ImageUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +48,9 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
     private val _monthlyCapsules = MutableStateFlow<List<MonthlySoundCapsuleData>>(emptyList())
     val monthlyCapsules: StateFlow<List<MonthlySoundCapsuleData>> = _monthlyCapsules
 
+    private val _isSharingImage = MutableStateFlow(false)
+    val isSharingImage: StateFlow<Boolean> = _isSharingImage
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -67,6 +75,95 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             Log.e("SoundCapsuleVM", "User email is blank on update, cannot load capsules.")
             _monthlyCapsules.value = createEmptyOrErrorCapsuleList("Error: User not logged in")
             _isLoading.value = false
+        }
+    }
+
+    fun shareCapsuleAsImage(
+        contextForActivity: Context,
+        capsuleData: MonthlySoundCapsuleData
+    ) {
+        if (_isSharingImage.value) {
+            return
+        }
+
+        _isSharingImage.value = true
+        viewModelScope.launch {
+            try {
+                val mainImageUrl = capsuleData.topSongImageUrl
+                    ?: capsuleData.topArtistImageUrl
+                    ?: capsuleData.dayStreakImage
+
+                val displayMetrics = getApplication<Application>().resources.displayMetrics
+                val fontScale = displayMetrics.scaledDensity / displayMetrics.density
+                val density = Density(density = displayMetrics.density, fontScale = fontScale)
+
+
+                val widthPx = density.run { 360.dp.toPx().toInt() }
+                val heightPx = density.run { 640.dp.toPx().toInt() }
+
+                Log.d("ShareCapsule", "Attempting to create bitmap: ${widthPx}x$heightPx with density: ${density.density}, fontScale: ${density.fontScale}")
+
+                val bitmap = ImageUtils.createBitmapFromComposable(
+                    context = getApplication(),
+                    widthPx = widthPx,
+                    heightPx = heightPx
+                ) {
+                    CapsuleShareView(
+                        capsuleData = capsuleData,
+                        mainImageUrl = mainImageUrl
+                    )
+                }
+
+                if (bitmap != null) {
+                    Log.d("ShareCapsule", "Bitmap created successfully.")
+                    val imageFile = ImageUtils.saveBitmapToTempFile(getApplication(), bitmap)
+
+                    if (imageFile != null) {
+                        Log.d("ShareCapsule", "Bitmap saved to temp file: ${imageFile.absolutePath}")
+                        val imageUri = ImageUtils.getUriForFile(getApplication(), imageFile)
+                        Log.d("ShareCapsule", "Image URI: $imageUri")
+
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, imageUri)
+                            putExtra(Intent.EXTRA_SUBJECT, "My ${capsuleData.monthYear} Sound Capsule")
+                            putExtra(Intent.EXTRA_TEXT, "Check out my ${capsuleData.monthYear} Sound Capsule on Purrify! #PurrifyCapsule")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        val chooserIntent = Intent.createChooser(shareIntent, "Share Sound Capsule Via")
+                        if (contextForActivity is android.app.Activity) {
+                            contextForActivity.startActivity(chooserIntent)
+                        } else {
+                            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            getApplication<Application>().startActivity(chooserIntent)
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(getApplication(), "Sharing via application context...", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        Log.e("ShareCapsule", "Failed to save shareable image to temp file.")
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(getApplication(), "Failed to save shareable image.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    Log.e("ShareCapsule", "Failed to create bitmap from Composable.")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "Failed to create shareable image.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("ShareCapsule", "Error sharing capsule as image", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Error sharing: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                withContext(Dispatchers.Main){
+                    _isSharingImage.value = false
+                }
+            }
         }
     }
 
