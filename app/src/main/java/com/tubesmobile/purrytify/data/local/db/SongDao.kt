@@ -146,4 +146,31 @@ interface SongDao {
     ORDER BY playCount DESC
     """)
     fun getTopSongsInMonthByPlayCount(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
+
+    @Query("""
+    SELECT s.artist, COUNT(DISTINCT spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration 
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail
+    AND spl.playedAtTimestamp >= :startTimeMillis
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY s.artist
+    ORDER BY totalDuration DESC 
+    """)
+    fun getTopArtistsInMonthByDuration(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<ArtistPlayStats>>
+
+    @Query("""
+    SELECT spl.songId, s.title, s.artist, s.artworkUri, s.uri as songUri, s.duration as songDuration,
+           COUNT(spl.songId) as playCount, SUM(spl.durationListenedMillis) as totalDuration
+    FROM song_play_log spl
+    JOIN songs s ON spl.songId = s.id
+    WHERE spl.userEmail = :userEmail
+    AND spl.playedAtTimestamp >= :startTimeMillis
+    AND spl.playedAtTimestamp < :endTimeMillis
+    AND spl.isLocal = 1
+    GROUP BY spl.songId, s.title, s.artist, s.artworkUri, s.uri, s.duration
+    ORDER BY totalDuration DESC
+    """)
+    fun getTopSongsInMonthByDuration(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
 }
