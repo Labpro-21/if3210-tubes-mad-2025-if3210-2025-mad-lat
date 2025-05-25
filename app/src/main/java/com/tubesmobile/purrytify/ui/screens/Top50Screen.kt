@@ -86,6 +86,7 @@ fun Top50Screen(
                 if (currentSong != null && musicService != null) {
                     BottomPlayerBar(
                         musicService = musicService,
+                        musicDbViewModel = musicDbViewModel,
                         navController = navController,
                         fromScreen = Screen.HOME,
                         isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
@@ -224,7 +225,7 @@ fun Top50Screen(
                                         artworkUri = apiSong.artwork
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
-                                    musicService?.playSong(song)
+                                    musicService?.playSong(song, musicDbViewModel)
                                     navController.navigate("music/${Screen.HOME.name}/true/-1")
                                 }
                             )
