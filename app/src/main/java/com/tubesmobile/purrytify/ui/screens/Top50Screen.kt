@@ -68,10 +68,8 @@ fun Top50Screen(
     val songs = if (type == "global") onlineGlobalSongs else onlineCountrySongs
     val title = if (type == "global") "Top 50 Global" else "Top 10 ${DataKeeper.location}"
 
-    // State for search query
     var searchQuery by remember { mutableStateOf("") }
 
-    // Filtered songs based on search query
     val filteredSongs = remember(songs, searchQuery) {
         if (searchQuery.isBlank()) {
             songs
