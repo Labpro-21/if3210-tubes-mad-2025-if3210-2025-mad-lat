@@ -2,7 +2,6 @@ package com.tubesmobile.purrytify.ui.screens
 
 import android.content.res.Configuration
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -360,16 +359,12 @@ fun ProfileContent(
     isLoadingCapsules: Boolean,
     onLogout: () -> Unit
 ) {
-    val soundCapsuleViewModel: SoundCapsuleViewModel = viewModel()
-    val profileState by viewModel.profile.collectAsState()
     val context = LocalContext.current
     val baseUrl = "http://34.101.226.132:3000"
     val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
     val profilePhotoUrl = "$baseUrl/uploads/profile-picture/$sanitizedPhoto"
     var expanded by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
-    val activity = LocalContext.current as? android.app.Activity
-
     var currentCapsuleIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(monthlyCapsulesFromVM) {
@@ -445,27 +440,26 @@ fun ProfileContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
                 )
-            }
-            else if (currentCapsuleToDisplay != null) {
+            } else if (currentCapsuleToDisplay != null) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++ },
-                        enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
+                        onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
+                        enabled = currentCapsuleIndex > 0
                     ) {
-                        Icon(Icons.Filled.ArrowBackIosNew, "Next Month",
-                            tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                        Icon(Icons.Filled.ArrowBackIosNew, "Previous Month",
+                            tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
                     }
                     Text(currentCapsuleToDisplay.monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     IconButton(
-                        onClick = {  if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
-                        enabled = currentCapsuleIndex > 0
+                        onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++ },
+                        enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
                     ) {
-                        Icon(Icons.Filled.ArrowForwardIos, "Previous Month",
-                            tint = if (currentCapsuleIndex > 0 ) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                        Icon(Icons.Filled.ArrowForwardIos, "Next Month",
+                            tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
                     }
                 }
 
@@ -489,27 +483,8 @@ fun ProfileContent(
                             navController.navigate("topSongsDetail")
                         }
                     },
-                    onShareClick = {
-                        if (currentCapsuleToDisplay.hasData && !soundCapsuleViewModel.isSharingImage.value) {
-                            if (activity != null) {
-                                soundCapsuleViewModel.shareCapsuleAsImage(
-                                    contextForActivity = activity,
-                                    capsuleData = currentCapsuleToDisplay
-                                )
-                            } else {
-                                Toast.makeText(context, "Cannot initiate share: Action requires an active screen.", Toast.LENGTH_LONG).show()
-                            }
-                        } else if (soundCapsuleViewModel.isSharingImage.value) {
-                            Toast.makeText(context, "Preparing image, please wait...", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onDownloadClick = {
-                        if (currentCapsuleToDisplay.hasData) {
-                            val username = (profileState as? ProfileViewModel.ProfileState.Success)?.profile?.username ?: "User"
-                            soundCapsuleViewModel.exportCapsuleToPdf(context, currentCapsuleToDisplay, username)
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    onShareClick = { /* TODO: Implement share */ },
+                    modifier = Modifier
                 )
             } else {
                 Text(

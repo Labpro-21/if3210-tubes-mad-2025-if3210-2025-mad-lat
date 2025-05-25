@@ -7,7 +7,6 @@ import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Parcelable
 import android.util.Log
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -81,9 +80,6 @@ import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel.ProfileState
 import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import kotlinx.parcelize.Parcelize
 
 @Composable
 fun HomeScreen(
@@ -1165,7 +1161,6 @@ private fun isSafeFilePath(path: String): Boolean {
     return !path.contains("..") && !path.startsWith("/") && path.isNotBlank()
 }
 
-@Parcelize
 data class Song(
     val id: Int? = null,
     val title: String,
@@ -1173,7 +1168,7 @@ data class Song(
     val duration: Long,
     val uri: String,
     val artworkUri: String
-) : Parcelable
+)
 
 data class SongTimestamp(
     val userEmail: String,
