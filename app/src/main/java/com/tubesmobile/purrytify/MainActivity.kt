@@ -52,6 +52,9 @@ import com.tubesmobile.purrytify.ui.viewmodel.NetworkViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import android.app.Application
+import com.tubesmobile.purrytify.ui.screens.TimeListenedScreen
+import com.tubesmobile.purrytify.ui.screens.TopArtistsScreen
+import com.tubesmobile.purrytify.ui.screens.TopSongsScreen
 import org.osmdroid.config.Configuration
 import java.io.File // Added for File operations
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
@@ -334,6 +337,17 @@ fun PurrytifyNavHost(
                 musicBehaviorViewModel = musicBehaviorViewModel
             )
         }
+
+        composable("timeListenedDetail") {
+            TimeListenedScreen(navController)
+        }
+        composable("topArtistsDetail") {
+            TopArtistsScreen(navController)
+        }
+        composable("topSongsDetail") {
+            TopSongsScreen(navController)
+        }
+
         composable(
             route = "music/{sourceScreen}/{isFromApiSong}/{songId}",
             arguments = listOf(
