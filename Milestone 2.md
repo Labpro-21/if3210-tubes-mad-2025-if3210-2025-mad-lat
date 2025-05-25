@@ -5,9 +5,7 @@
 - [Deskripsi Aplikasi Web](#-deskripsi-aplikasi-web)
 - [Cara Menjalankan Aplikasi](#-cara-menjalankan-aplikasi)
 - [Daftar Library](#-daftar-library)
-- [Screenshot Aplikasi](#-screenshot-aplikasi)
 - [Pembagian Kerja Kelompok](#-pembagian-kerja-kelompok)
-- [Pengerjaan Bonus](#-pengerjaan-bonus)
 - [Total Jam Persiapan dan Pengerjaan](#-total-jam-persiapan-dan-pengerjaan)
 
 ## ✨ Deskripsi Aplikasi Web
