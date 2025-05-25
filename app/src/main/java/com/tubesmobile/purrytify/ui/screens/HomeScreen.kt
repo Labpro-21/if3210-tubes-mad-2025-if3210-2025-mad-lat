@@ -427,7 +427,7 @@ fun HomeScreen(
                     items(recommendedBasedOnLikes, key = { song -> "liked_${song.id}_${song.uri}" }) { song ->
                         RecommendedSongItem(song = song, onClick = { selectedSong ->
                             Log.d("HomeScreen", "Playing from 'Based on Likes': ${selectedSong.title}")
-                            musicService!!.playSong(selectedSong, musicDbViewModel)
+                            musicService!!.playSong(selectedSong, musicDbViewModel, onlineSongsViewModel)
                             val isApi = selectedSong.uri.startsWith("http")
                             navController.navigate("music/${Screen.HOME.name}/${isApi}/${selectedSong.id ?: -1}")
                         })
@@ -452,7 +452,7 @@ fun HomeScreen(
                     items(topGlobalRecommendations, key = { song -> "global_${song.id}_${song.uri}" }) { song ->
                         RecommendedSongItem(song = song, onClick = { selectedSong ->
                             Log.d("HomeScreen", "Playing from 'Top Global Mix': ${selectedSong.title}")
-                            musicService!!.playSong(selectedSong, musicDbViewModel)
+                            musicService!!.playSong(selectedSong, musicDbViewModel, onlineSongsViewModel)
                             navController.navigate("music/${Screen.HOME.name}/true/${selectedSong.id ?: -1}")
                         })
                     }
@@ -518,7 +518,7 @@ fun HomeScreen(
                                 song = song,
                                 onClick = { selectedSong ->
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
-                                    musicService?.playSong(selectedSong, musicDbViewModel)
+                                    musicService?.playSong(selectedSong, musicDbViewModel, onlineSongsViewModel)
                                     navController.navigate("music/${Screen.HOME.name}/false/-1")
                                 },
                                 musicService = musicService
@@ -587,7 +587,7 @@ fun HomeScreen(
                                 song = song,
                                 onClick = { selectedSong ->
                                     if (selectedSong.uri != currentSong?.uri) {
-                                        musicService?.playSong(selectedSong, musicDbViewModel)
+                                        musicService?.playSong(selectedSong, musicDbViewModel, onlineSongsViewModel)
                                     }
                                     musicDbViewModel.updateSongTimestamp(selectedSong)
                                     navController.navigate("music/${Screen.LIBRARY.name}/false/-1")

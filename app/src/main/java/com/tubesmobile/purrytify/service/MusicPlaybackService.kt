@@ -49,6 +49,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.media.session.MediaButtonReceiver
 import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.data.model.ApiSong
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import kotlinx.coroutines.*
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -93,8 +95,10 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
     private val _queue = mutableListOf<Song>()
     val queue: List<Song> get() = _queue
 
+    private var currentSessionListenedDurationMillis: Long = 0L
+    private var lastPlayTimestamp: Long = 0L
     private var currentSongStartTimeMillis: Long = 0L
-    private val MIN_PLAY_DURATION_FOR_LOG_MS = 30000
+    private val MIN_PLAY_DURATION_FOR_LOG_MS = 1000
 
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
@@ -1024,9 +1028,10 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
         }
     }
 
-    fun playSong(song: Song, musicDbViewModel: MusicDbViewModel) {
+    fun playSong(song: Song, musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         Log.i(TAG, "Service command: playSong for '${song.title}'")
 
+        // Validasi lagu
         if (!isValidSong(song)) {
             _audioError.value = "Invalid song data for '${song.title}'"
             Log.e(TAG, "playSong: Invalid song data for ${song.title}")
@@ -1035,8 +1040,9 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
             return
         }
 
+        // Validasi URI
         val uri = Uri.parse(song.uri)
-        if (!isValidUri(uri)) { // Jika isValidUri tidak perlu context
+        if (!isValidUri(uri)) {
             _audioError.value = "Invalid song URI for '${song.title}'"
             Log.e(TAG, "playSong: Invalid song URI ${song.uri}")
             updatePlaybackState(PlaybackStateCompat.STATE_ERROR, 0L)
@@ -1044,24 +1050,34 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
             return
         }
 
-        _currentSong.value = song
+        // Log durasi lagu sebelumnya (jika ada)
+        logCurrentSongPlayDuration(musicDbViewModel)
 
-        if (!requestAudioFocus()) { // Minta audio focus SEBELUM memulai playback
+        // Update state lagu saat ini
+        _currentSong.value = song
+        currentSessionListenedDurationMillis = 0L
+        lastPlayTimestamp = System.currentTimeMillis()
+        currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
+
+        // Minta audio focus sebelum memulai playback
+        if (!requestAudioFocus()) {
             Log.w(TAG, "Audio focus request failed for ${song.title}. Playback aborted.")
             _audioError.value = "Could not get audio focus."
             return
         }
 
-        // Ambil artwork di background SEBELUM prepareAsync agar bisa di-set di metadata lebih awal
+        // Ambil artwork di background
         serviceScope.launch {
             artworkBitmapCache = getArtworkBitmapFromUri(song.artworkUri)
-            updateMediaSessionMetadata() // Update metadata dengan artwork (dan durasi awal jika diketahui)
+            updateMediaSessionMetadata() // Update metadata dengan artwork
         }
 
         try {
+            // Release MediaPlayer lama
             Log.d(TAG, "Releasing old MediaPlayer instance if any.")
-            mediaPlayer?.release() // Release instance lama sebelum membuat yang baru
+            mediaPlayer?.release()
 
+            // Buat MediaPlayer baru
             Log.d(TAG, "Creating new MediaPlayer instance for ${song.title}")
             mediaPlayer = MediaPlayer().apply {
                 setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
@@ -1072,83 +1088,106 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
                         .build()
                 )
 
+                // Set data source berdasarkan skema URI
                 val scheme = uri.scheme?.lowercase()
                 Log.d(TAG, "Setting MediaPlayer dataSource with URI: $uri, Scheme: $scheme")
                 if (scheme == "http" || scheme == "https") {
                     setDataSource(song.uri)
                 } else {
-                    setDataSource(this@MusicPlaybackService, uri) // 'this@MusicPlaybackService' adalah Context Service
+                    setDataSource(this@MusicPlaybackService, uri)
                 }
 
+                // Prepare async
                 Log.d(TAG, "Calling prepareAsync for ${song.title}")
-                prepareAsync() // Listener akan menangani sisanya
+                prepareAsync()
 
+                // Listener saat MediaPlayer siap
                 setOnPreparedListener { mp ->
                     Log.i(TAG, "MediaPlayer prepared for ${song.title}. Duration: ${mp.duration}ms.")
-                    currentSongStartTimeMillis = System.currentTimeMillis() // Set waktu mulai di sini
+                    currentSongStartTimeMillis = System.currentTimeMillis()
                     _duration.value = mp.duration
-
-                    Log.d(TAG, "Attempting to start playback for ${song.title}.")
                     mp.start()
                     _isPlaying.value = true
 
-                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, 0L) // Update state ke playing, posisi 0
-                    updateMediaSessionMetadata() // Pastikan metadata (terutama durasi) sudah benar
+                    // Update state dan metadata
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, 0L)
+                    updateMediaSessionMetadata()
 
+                    // Mulai notifikasi foreground
                     Log.i(TAG, "Calling startForegroundNotificationAndUpdate for ${song.title}")
                     startForegroundNotificationAndUpdate()
 
-                    startProgressUpdater() // Mulai update progress untuk slider UI & Notifikasi
+                    // Mulai update progress untuk UI dan notifikasi
+                    startProgressUpdater()
 
+                    // Set perangkat audio jika bukan emulator
                     if (!isEmulator) {
                         _currentAudioDevice.value?.let { device ->
                             if (device.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                                val audioManagerSys = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                                val availableDevices = audioManagerSys.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                val availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                                 val targetDevice = availableDevices.find { it.id == device.id }
-                                mp.setPreferredDevice(targetDevice) // Gunakan 'mp' dari listener
+                                mp.setPreferredDevice(targetDevice)
                                 Log.d(TAG, "Preferred device set (if any) for ${song.title}")
                             }
                         }
                     }
+
+                    // Update timestamp di database
+                    musicDbViewModel.updateSongTimestamp(song)
                     logCurrentSongPlayDuration(musicDbViewModel, isCompletion = false)
                 }
 
+                // Listener saat lagu selesai
                 setOnCompletionListener {
                     Log.i(TAG, "MediaPlayer onCompletion for ${song.title}.")
-                    // Log durasi putar sebelum pindah lagu
-                    logCurrentSongPlayDuration(musicDbViewModel, isCompletion = true)
-                    _isPlaying.value = false // Update state
-                    // Update posisi ke akhir durasi
+                    updateAndLogDurationOnEvent(musicDbViewModel)
+                    _isPlaying.value = false
                     updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, _duration.value.toLong())
                     progressUpdateJob?.cancel()
-                    // Panggil onSkipToNext dari MediaSession untuk logika repeat/shuffle/next
-                    mediaSession?.controller?.transportControls?.skipToNext()
+                    playNext(musicDbViewModel, onlineSongsViewModel) // Panggil playNext untuk logika next
                 }
 
+                // Listener untuk error
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "MediaPlayer error for ${song.title}: code $what, extra $extra")
                     _isPlaying.value = false
                     _audioError.value = "Playback error on ${song.title}: code $what"
-                    updatePlaybackState(PlaybackStateCompat.STATE_ERROR, mediaPlayer?.currentPosition?.toLong() ?: 0L)
-                    updateNotification() // Update notif untuk menunjukkan error
-                    true // Menandakan error sudah ditangani
+                    updatePlaybackState(PlaybackStateCompat.STATE_ERROR, mediaPlayer!!.currentPosition.toLong())
+                    updateNotification()
+                    true
                 }
             }
-            // startUpdatingProgress() // Pindahkan ke setOnPreparedListener setelah mp.start()
         } catch (e: SecurityException) {
             Log.e(TAG, "Security error setting up MediaPlayer for ${song.title}", e)
             _audioError.value = "Security error: ${e.message}"
             updatePlaybackState(PlaybackStateCompat.STATE_ERROR, 0L)
+            updateNotification()
         } catch (e: IOException) {
             Log.e(TAG, "IO error setting up MediaPlayer for ${song.title}", e)
             _audioError.value = "IO error: ${e.message}"
             updatePlaybackState(PlaybackStateCompat.STATE_ERROR, 0L)
+            updateNotification()
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error setting up MediaPlayer for ${song.title}", e)
             _audioError.value = "Unexpected error: ${e.message}"
             updatePlaybackState(PlaybackStateCompat.STATE_ERROR, 0L)
+            updateNotification()
         }
+    }
+
+    private fun updateCurrentSessionListenedDuration() {
+        if (_isPlaying.value && lastPlayTimestamp > 0) {
+            val elapsed = System.currentTimeMillis() - lastPlayTimestamp
+            currentSessionListenedDurationMillis += elapsed
+            lastPlayTimestamp = System.currentTimeMillis()
+        }
+    }
+
+    private fun updateAndLogDurationOnEvent(musicDbViewModel: MusicDbViewModel) {
+        updateCurrentSessionListenedDuration()
+        logCurrentSongPlayDuration(musicDbViewModel)
+        currentSessionListenedDurationMillis = 0L
     }
 
     private fun logCurrentSongPlayDuration(musicDbViewModel: MusicDbViewModel, isCompletion: Boolean = false) {
@@ -1160,48 +1199,35 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
             return
         }
 
-        // Check if the song exists in the database
-        serviceScope.launch(Dispatchers.IO) {
-            val songExists = musicDbViewModel.isSongExists(songToLog.id)
-            if (!songExists) {
-                Log.d("MusicBehaviorVM", "Skipping log: song with id ${songToLog.id} does not exist in database")
-                return@launch
-            }
+        val finalDurationToLog = currentSessionListenedDurationMillis.coerceAtMost(songToLog.duration)
 
-            val endTimeMillis = System.currentTimeMillis()
-            var listenedDurationMillis = 0L
-
-            try {
-                listenedDurationMillis = if (isCompletion) {
-                    (endTimeMillis - currentSongStartTimeMillis).coerceAtMost(songToLog.duration)
-                } else {
-                    (endTimeMillis - currentSongStartTimeMillis).coerceAtLeast(0)
+        if (finalDurationToLog >= MIN_PLAY_DURATION_FOR_LOG_MS) {
+            serviceScope.launch(Dispatchers.IO) {
+                val songExists = musicDbViewModel.isSongExists(songToLog.id)
+                if (!songExists) {
+                    Log.d("MusicPlaybackService", "Skipping log: song with id ${songToLog.id} does not exist in database")
+                    return@launch
                 }
-                // Ensure listened duration isn't negative or excessively large
-                listenedDurationMillis = listenedDurationMillis.coerceIn(0, songToLog.duration)
 
-            } catch (e: IllegalStateException) {
-                // MediaPlayer might be in an invalid state
-                Log.e("MusicBehaviorVM", "Error getting current position for logging: ${e.message}")
-                listenedDurationMillis = endTimeMillis - currentSongStartTimeMillis // Fallback
-            }
+                val userEmail = DataKeeper.email
+                if (userEmail.isNullOrBlank()) {
+                    Log.e("MusicPlaybackService", "Skipping log: User email is null or blank")
+                    return@launch
+                }
 
-            if (listenedDurationMillis >= MIN_PLAY_DURATION_FOR_LOG_MS) {
-                val userEmail = DataKeeper.email ?: return@launch // Should not be null
                 val playLog = SongPlayLogEntity(
                     songId = songToLog.id,
                     userEmail = userEmail,
-                    playedAtTimestamp = currentSongStartTimeMillis,
-                    durationListenedMillis = listenedDurationMillis,
+                    playedAtTimestamp = System.currentTimeMillis(),
+                    durationListenedMillis = finalDurationToLog,
                     isLocal = true
                 )
                 musicDbViewModel.insertSongPlayLog(playLog)
-                Log.d("MusicBehaviorVM", "Logged play: ${songToLog.title}, Duration: $listenedDurationMillis ms")
-
-                musicDbViewModel.updateSongTimestamp(songToLog)
+                Log.d("MusicPlaybackService", "Logged play: ${songToLog.title}, Actual Duration Listened: $finalDurationToLog ms, Played At: ${playLog.playedAtTimestamp}")
             }
+        } else {
+            Log.d("MusicPlaybackService", "Skipping log for ${songToLog.title}: duration $finalDurationToLog ms < $MIN_PLAY_DURATION_FOR_LOG_MS ms")
         }
-        currentSongStartTimeMillis = 0L
     }
 
     fun togglePlayPause(musicDbViewModel: MusicDbViewModel) {
@@ -1259,57 +1285,116 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
         _playlist.addAll(songs.filter { isValidSong(it) })
     }
 
-    fun playNext(musicDbViewModel: MusicDbViewModel) {
-        logCurrentSongPlayDuration(musicDbViewModel)
+    fun playNext(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
+        updateAndLogDurationOnEvent(musicDbViewModel) // Log lagu saat ini sebelum pindah
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
-            playSong(nextFromQueue, musicDbViewModel)
+            playSong(nextFromQueue, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNextFromPlaylist(musicDbViewModel)
+            playNextFromPlaylist(musicDbViewModel, onlineSongsViewModel)
         }
     }
 
-    private fun playNextFromPlaylist(musicDbViewModel: MusicDbViewModel) {
+    private fun playNextFromPlaylist(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         val list = _playlist
-        if (list.isEmpty()) return
+
+        val currentSongId = _currentSong.value?.id
+        var songList = onlineSongsViewModel.onlineGlobalSongs.value
+        var currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+
+        var nextSongIndex = -1
+        var nextSong = ApiSong(0,"","","","","","",0,"","")
+
+        if (currentSongIndex == -1) { // song not in global but in country
+            songList = onlineSongsViewModel.onlineCountrySongs.value
+            currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+        }
+
+        if (currentSongIndex != -1){ // song is in global or country (else skip this section)
+            nextSongIndex = if (currentSongIndex + 1 >= songList.size) 0 else currentSongIndex + 1
+            nextSong = songList[nextSongIndex]
+
+            val song = Song(
+                id = nextSong.id,
+                title = nextSong.title,
+                artist = nextSong.artist,
+                uri = nextSong.url,
+                duration = parseDurationToMillis(nextSong.duration),
+                artworkUri = nextSong.artwork
+            )
+            currentIndex = _playlist.indexOfFirst { it.id == nextSong.id }
+            if (currentIndex == -1) currentIndex = 0
+            playSong(song, musicDbViewModel, onlineSongsViewModel)
+            return
+        }
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it, musicDbViewModel) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel, onlineSongsViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex], musicDbViewModel)
+                    playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
-                playSong(list[currentIndex], musicDbViewModel)
+                playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
             }
         }
     }
 
-    fun playPrevious(musicDbViewModel: MusicDbViewModel) {
-        logCurrentSongPlayDuration(musicDbViewModel)
+    fun playPrevious(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
+        updateAndLogDurationOnEvent(musicDbViewModel)
+
         val list = _playlist
-        if (list.isEmpty()) return
+
+        val currentSongId = _currentSong.value?.id
+        var songList = onlineSongsViewModel.onlineGlobalSongs.value
+        var currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+
+        var prevSongIndex = -1
+        var prevSong = ApiSong(0,"","","","","","",0,"","")
+
+        if (currentSongIndex == -1) { // song not in global but in country
+            songList = onlineSongsViewModel.onlineCountrySongs.value
+            currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+        }
+
+        if (currentSongIndex != -1){ // song is in global or country (else skip this section)
+            prevSongIndex = if (currentSongIndex <= 0) songList.size - 1 else currentSongIndex - 1
+            prevSong = songList[prevSongIndex]
+
+            val song = Song(
+                id = prevSong.id,
+                title = prevSong.title,
+                artist = prevSong.artist,
+                uri = prevSong.url,
+                duration = parseDurationToMillis(prevSong.duration),
+                artworkUri = prevSong.artwork
+            )
+            currentIndex = _playlist.indexOfFirst { it.id == prevSong.id }
+            if (currentIndex == -1) currentIndex = 0
+            playSong(song, musicDbViewModel, onlineSongsViewModel)
+            return
+        }
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it, musicDbViewModel) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel, onlineSongsViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex], musicDbViewModel)
+                    playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = if (currentIndex <= 0) list.size - 1 else currentIndex - 1
-                playSong(list[currentIndex], musicDbViewModel)
+                playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
             }
         }
     }
@@ -1328,23 +1413,24 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
         }
     }
 
-    fun playNextFromQueue(musicDbViewModel: MusicDbViewModel) {
+    fun playNextFromQueue(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong, musicDbViewModel)
+            playSong(nextSong, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNext(musicDbViewModel)
+            playNext(musicDbViewModel, onlineSongsViewModel)
         }
     }
 
-    fun playOrQueueNext(musicDbViewModel: MusicDbViewModel) {
+    fun playOrQueueNext(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong, musicDbViewModel)
+            playSong(nextSong, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNext(musicDbViewModel)
+            playNext(musicDbViewModel, onlineSongsViewModel)
         }
     }
+
 
     fun stopPlayback(musicDbViewModel: MusicDbViewModel) {
         logCurrentSongPlayDuration(musicDbViewModel)
@@ -1399,4 +1485,11 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
     private fun isValidSong(song: Song): Boolean {
         return song.uri.isNotBlank() && song.title.isNotBlank() && song.artist.isNotBlank()
     }
+}
+
+private fun parseDurationToMillis(duration: String): Long {
+    val parts = duration.split(":")
+    val minutes = parts[0].toLongOrNull() ?: 0L
+    val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+    return (minutes * 60 + seconds) * 1000
 }
