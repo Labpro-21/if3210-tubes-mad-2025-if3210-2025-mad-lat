@@ -195,6 +195,8 @@ fun ProfileContent(
     isLoadingCapsules: Boolean,
     onLogout: () -> Unit
 ) {
+    val soundCapsuleViewModel: SoundCapsuleViewModel = viewModel()
+    val profileState by viewModel.profile.collectAsState()
     val context = LocalContext.current
     val baseUrl = "http://34.101.226.132:3000"
     val sanitizedPhoto = sanitizeFileName(profile.profilePhoto)
@@ -321,6 +323,12 @@ fun ProfileContent(
                         }
                     },
                     onShareClick = { /* TODO: Implement share */ },
+                    onDownloadClick = {
+                        if (currentCapsuleToDisplay.hasData) {
+                            val username = (profileState as? ProfileViewModel.ProfileState.Success)?.profile?.username ?: "User"
+                            soundCapsuleViewModel.exportCapsuleToPdf(context, currentCapsuleToDisplay, username)
+                        }
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             } else {
@@ -353,12 +361,12 @@ fun ProfileContent(
     }
 
     if (showEditProfileDialog) {
-        val profileDataForDialog = ProfileData( // Ensure ProfileData is defined
+        val profileDataForDialog = ProfileData(
             currentUsername = profile.username,
             currentLocation = profile.location,
             currentProfilePhotoUrl = if (profile.profilePhoto.isNotEmpty()) "$baseUrl/uploads/profile-picture/${sanitizeFileName(profile.profilePhoto)}" else null
         )
-        SwipeableProfileEditDialog( // Ensure this composable is defined and handles its state
+        SwipeableProfileEditDialog(
             onDismiss = { showEditProfileDialog = false },
             existingProfile = profileDataForDialog,
             onSaveProfile = { locationToSave, profilePhotoUriToSave, onSaveComplete, onError ->
@@ -366,11 +374,11 @@ fun ProfileContent(
                     location = locationToSave,
                     profilePhotoUri = profilePhotoUriToSave,
                     onSuccess = {
-                        viewModel.loadProfile() // Reload profile to see changes
+                        viewModel.loadProfile()
                         onSaveComplete()
                     },
                     onFailure = { errorMsg ->
-                        onError(errorMsg) // Pass error message to dialog
+                        onError(errorMsg)
                     }
                 )
             }
