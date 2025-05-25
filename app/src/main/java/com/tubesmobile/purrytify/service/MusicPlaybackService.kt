@@ -121,7 +121,7 @@ class MusicPlaybackService : Service() {
         fun getService(): MusicPlaybackService = this@MusicPlaybackService
     }
 
-    public fun onCleared() {
+    fun onCleared() {
         mediaPlayer?.release()
         mediaPlayer = null
         updateJob?.cancel()
@@ -135,7 +135,6 @@ class MusicPlaybackService : Service() {
         _currentAudioDevice.value = null
         _audioError.value = null
     }
-
 
     override fun onCreate() {
         super.onCreate()
@@ -407,7 +406,19 @@ class MusicPlaybackService : Service() {
         val songToLog = _currentSong.value
         val mediaPlayerInstance = mediaPlayer
 
-        if (songToLog != null && songToLog.id != null && mediaPlayerInstance != null) { // song.id != null means it's a local DB song
+        if (songToLog == null || songToLog.id == null || mediaPlayerInstance == null) {
+            Log.d("MusicBehaviorVM", "Skipping log: song or id is null, or media player is not initialized")
+            return
+        }
+
+        // Check if the song exists in the database
+        serviceScope.launch(Dispatchers.IO) {
+            val songExists = musicDbViewModel.isSongExists(songToLog.id)
+            if (!songExists) {
+                Log.d("MusicBehaviorVM", "Skipping log: song with id ${songToLog.id} does not exist in database")
+                return@launch
+            }
+
             val endTimeMillis = System.currentTimeMillis()
             var listenedDurationMillis = 0L
 
@@ -415,12 +426,10 @@ class MusicPlaybackService : Service() {
                 listenedDurationMillis = if (isCompletion) {
                     (endTimeMillis - currentSongStartTimeMillis).coerceAtMost(songToLog.duration)
                 } else {
-                    (mediaPlayerInstance.currentPosition.toLong() - (currentSongStartTimeMillis - (endTimeMillis - mediaPlayerInstance.currentPosition.toLong()))).coerceAtLeast(0)
-                    (endTimeMillis - currentSongStartTimeMillis)
+                    (endTimeMillis - currentSongStartTimeMillis).coerceAtLeast(0)
                 }
                 // Ensure listened duration isn't negative or excessively large
                 listenedDurationMillis = listenedDurationMillis.coerceIn(0, songToLog.duration)
-
 
             } catch (e: IllegalStateException) {
                 // MediaPlayer might be in an invalid state
@@ -428,9 +437,8 @@ class MusicPlaybackService : Service() {
                 listenedDurationMillis = endTimeMillis - currentSongStartTimeMillis // Fallback
             }
 
-
             if (listenedDurationMillis >= MIN_PLAY_DURATION_FOR_LOG_MS) {
-                val userEmail = DataKeeper.email ?: return // Should not be null
+                val userEmail = DataKeeper.email ?: return@launch // Should not be null
                 val playLog = SongPlayLogEntity(
                     songId = songToLog.id,
                     userEmail = userEmail,
