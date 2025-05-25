@@ -11,6 +11,13 @@ import com.tubesmobile.purrytify.data.model.ArtistPlayStats
 import com.tubesmobile.purrytify.data.model.SongPlayStats
 import kotlinx.coroutines.flow.Flow
 
+import java.util.concurrent.TimeUnit
+
+data class DailyPlayDuration(
+    val dayOfMonth: Int,
+    val totalDurationMillis: Long
+)
+
 @Dao
 interface SongDao {
 
@@ -173,4 +180,19 @@ interface SongDao {
     ORDER BY totalDuration DESC
     """)
     fun getTopSongsInMonthByDuration(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): Flow<List<SongPlayStats>>
+
+    @Query("""
+        SELECT 
+            CAST(strftime('%d', datetime(playedAtTimestamp / 1000, 'unixepoch', 'localtime')) AS INTEGER) as dayOfMonth, 
+            SUM(durationListenedMillis) as totalDurationMillis
+        FROM song_play_log
+        WHERE userEmail = :userEmail
+            AND playedAtTimestamp >= :startTimeMillis
+            AND playedAtTimestamp < :endTimeMillis
+            AND isLocal = 1
+            AND durationListenedMillis > 0 -- Hanya hitung jika ada durasi
+        GROUP BY dayOfMonth
+        ORDER BY dayOfMonth ASC
+    """)
+    suspend fun getDailyPlayDurationsInMonth(userEmail: String, startTimeMillis: Long, endTimeMillis: Long): List<DailyPlayDuration>
 }

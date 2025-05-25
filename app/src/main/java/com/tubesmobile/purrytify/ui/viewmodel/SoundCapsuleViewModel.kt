@@ -22,19 +22,32 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
+data class DailyChartData(
+    val day: Int,
+    val minutesListened: Int,
+    val label: String
+)
+
 class SoundCapsuleViewModel(application: Application) : AndroidViewModel(application) {
     private val songDao: SongDao = AppDatabase.getDatabase(application).songDao()
     private var currentUserEmail = DataKeeper.email ?: ""
+
+    private val _dailyChartData = MutableStateFlow<List<DailyChartData>>(emptyList())
+    val dailyChartData: StateFlow<List<DailyChartData>> = _dailyChartData
 
     private val _monthlyCapsules = MutableStateFlow<List<MonthlySoundCapsuleData>>(emptyList())
     val monthlyCapsules: StateFlow<List<MonthlySoundCapsuleData>> = _monthlyCapsules
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _isLoadingDailyChart = MutableStateFlow(false)
+    val isLoadingDailyChart: StateFlow<Boolean> = _isLoadingDailyChart
 
     init {
         if (DataKeeper.email != null && DataKeeper.email!!.isNotBlank()) {
@@ -54,6 +67,48 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             Log.e("SoundCapsuleVM", "User email is blank on update, cannot load capsules.")
             _monthlyCapsules.value = createEmptyOrErrorCapsuleList("Error: User not logged in")
             _isLoading.value = false
+        }
+    }
+
+    fun loadDailyChartDataForCapsule(capsule: MonthlySoundCapsuleData?) {
+        if (capsule == null || currentUserEmail.isBlank()) {
+            _dailyChartData.value = emptyList()
+            return
+        }
+        _isLoadingDailyChart.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val calendar = Calendar.getInstance(TimeZone.getDefault())
+                val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                try {
+                    calendar.time = sdf.parse(capsule.monthYear) ?: Date()
+                } catch (e: Exception) {
+                    Log.e("SoundCapsuleVM", "Failed to parse monthYear for daily chart: ${capsule.monthYear}", e)
+                }
+
+                val (startTime, endTime) = getMonthStartAndEndTimestamps(calendar)
+
+                val rawDailyData = songDao.getDailyPlayDurationsInMonth(currentUserEmail, startTime, endTime)
+
+                val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val chartDataList = mutableListOf<DailyChartData>()
+
+                val dataMap = rawDailyData.associateBy { it.dayOfMonth }
+
+                for (day in 1..daysInMonth) {
+                    val durationMillis = dataMap[day]?.totalDurationMillis ?: 0L
+                    val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
+                    chartDataList.add(DailyChartData(day, minutes, day.toString()))
+                }
+                _dailyChartData.value = chartDataList
+            } catch (e: Exception) {
+                Log.e("SoundCapsuleVM", "Error loading daily chart data", e)
+                _dailyChartData.value = emptyList()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    _isLoadingDailyChart.value = false
+                }
+            }
         }
     }
 
