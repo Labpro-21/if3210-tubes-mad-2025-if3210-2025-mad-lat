@@ -391,7 +391,7 @@ fun HomeScreen(
                             ChartItem(
                                 title = "Top 50",
                                 subtitle = "GLOBAL",
-                                drawableResId = R.drawable.trump,
+                                drawableResId = R.drawable.global,
                                 onClick = { navController.navigate("top50/global") }
                             )
                         }
@@ -400,7 +400,7 @@ fun HomeScreen(
                             ChartItem(
                                 title = "Top 10",
                                 subtitle = locationSubtitle.uppercase(),
-                                drawableResId = R.drawable.prabowo,
+                                drawableResId = R.drawable.country,
                                 onClick = { navController.navigate("top50/country") }
                             )
                         }
