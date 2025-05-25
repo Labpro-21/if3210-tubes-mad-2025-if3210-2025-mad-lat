@@ -165,7 +165,7 @@ fun PortraitProfileLayout(
                             Screen.HOME -> navController.navigate("home") { popUpTo("home") { inclusive = true } }
                             Screen.LIBRARY -> navController.navigate("library")
                             Screen.PROFILE -> {}
-                            Screen.MUSIC -> {} // Assuming MUSIC is handled elsewhere or not directly navigated from bottom bar
+                            Screen.MUSIC -> {}
                         }
                     }
                 }
@@ -232,7 +232,7 @@ fun ProfileSideNavigationBar(
             .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 24.dp, horizontal = 12.dp)
     ) {
-        Spacer(Modifier.height(32.dp)) // Space for OS elements like time
+        Spacer(Modifier.height(32.dp))
         ProfileSideNavItem(
             text = "Home",
             icon = Icons.Filled.Home,
@@ -342,11 +342,7 @@ fun ProfileScreenContentArea(
                 )
             }
             is ProfileViewModel.ProfileState.SessionExpired -> {
-                LaunchedEffect(Unit) {
-                    // Already handled in the top-level ProfileScreen,
-                    // but good to ensure UI shows loading or similar
-                    // until navigation occurs.
-                }
+                LaunchedEffect(Unit) { }
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         }
@@ -395,7 +391,7 @@ fun ProfileContent(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 16.dp), // Add horizontal padding for content
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(50.dp))
@@ -417,7 +413,7 @@ fun ProfileContent(
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), // Adjusted padding
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 StatItem("SONGS", DataKeeper.songsAmount.toString())
@@ -432,7 +428,7 @@ fun ProfileContent(
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.fillMaxWidth() // Removed specific padding, inherits from parent
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -488,7 +484,7 @@ fun ProfileContent(
                         }
                     },
                     onShareClick = { /* TODO: Implement share */ },
-                    modifier = Modifier // Removed specific padding, inherits from parent
+                    modifier = Modifier
                 )
             } else {
                 Text(
@@ -566,7 +562,7 @@ fun StatItem(label: String, value: String) {
 
 fun sanitizeFileName(fileName: String): String {
     val maxLength = 100
-    val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_") // Allow underscore and hyphen
+    val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
     return if (safeName.length > maxLength) safeName.substring(0, maxLength) else safeName
 }
 

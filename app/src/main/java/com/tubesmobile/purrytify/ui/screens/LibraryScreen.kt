@@ -414,11 +414,11 @@ fun LibrarySideNavigationBar(
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .width(200.dp) // Standard width for side nav
-            .background(MaterialTheme.colorScheme.background) // Match screen background
+            .width(200.dp)
+            .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 24.dp, horizontal = 12.dp)
     ) {
-        Spacer(Modifier.height(32.dp)) // Space for OS elements like time
+        Spacer(Modifier.height(32.dp))
 
         LibrarySideNavItem(
             text = "Home",
@@ -646,7 +646,7 @@ fun SongItem(
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(song.artworkUri) {
-        imageBitmap = null // Reset for new song
+        imageBitmap = null
         if (song.artworkUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 try {

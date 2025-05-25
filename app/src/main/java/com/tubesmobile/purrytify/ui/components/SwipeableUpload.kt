@@ -28,9 +28,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -93,6 +96,7 @@ fun SwipeableUpload(
     var selectedArtwork by remember { mutableStateOf<ImageBitmap?>(null) }
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(LocalDensity.current) { configuration.screenHeightDp.dp.toPx() }
+    val screenWidthDp = configuration.screenWidthDp.dp
     val titleFocusRequester = remember { FocusRequester() }
     val artistFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -102,6 +106,10 @@ fun SwipeableUpload(
 
     val context = LocalContext.current
     var pickedFileName by remember { mutableStateOf<String?>(if (existingSong != null) shortenFilename(Uri.parse(existingSong.uri).lastPathSegment ?: "Audio File") else null) }
+
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val dialogHeight = if (isLandscape) (configuration.screenHeightDp * 0.9f).dp else 500.dp
+
 
     LaunchedEffect(existingSong) {
         if (existingSong != null && existingSong.artworkUri.isNotEmpty()) {
@@ -167,7 +175,7 @@ fun SwipeableUpload(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .height(500.dp)
+                    .height(dialogHeight)
                     .offset { IntOffset(0, offsetY.value.toInt()) }
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .draggable(
@@ -193,7 +201,8 @@ fun SwipeableUpload(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(8.dp),
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
@@ -215,7 +224,6 @@ fun SwipeableUpload(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Audio Upload Box (disabled in edit mode)
                         UploadBox(
                             label = pickedFileName ?: "Upload File",
                             image = null,
@@ -237,7 +245,6 @@ fun SwipeableUpload(
                     Text(
                         text = "Title",
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 16.sp,
                         modifier = Modifier.align(Alignment.Start)
                     )
                     OutlinedTextField(
@@ -255,7 +262,6 @@ fun SwipeableUpload(
                     Text(
                         text = "Artist",
                         color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 16.sp,
                         modifier = Modifier.align(Alignment.Start)
                     )
                     OutlinedTextField(
@@ -270,8 +276,14 @@ fun SwipeableUpload(
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (isLandscape && screenWidthDp > 600.dp) Arrangement.End else Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isLandscape && screenWidthDp > 600.dp) Spacer(Modifier.weight(1f))
                         ActionButtonUpload("Cancel", color = MaterialTheme.colorScheme.secondary) { onDismiss() }
+                        if (isLandscape && screenWidthDp > 600.dp) Spacer(Modifier.width(16.dp))
                         ActionButtonUpload(
                             "Save",
                             color = if (isSaveEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -279,7 +291,6 @@ fun SwipeableUpload(
                         ) {
                             if (title.isNotBlank() && artist.isNotBlank()) {
                                 if (existingSong != null) {
-                                    // Edit mode
                                     onEditSong(
                                         existingSong,
                                         title,
@@ -292,8 +303,7 @@ fun SwipeableUpload(
                                         }
                                     )
                                 } else if (audioUri != null) {
-                                    // Upload mode
-                                    val artworkSource = if (selectedArtwork != null && artworkUri == null) "Metadata comerciais = null" else artworkUri?.toString() ?: ""
+                                    val artworkSource = if (selectedArtwork != null && artworkUri == null) "Metadata" else artworkUri?.toString() ?: ""
                                     val newSong = Song(
                                         title = title,
                                         artist = artist,
@@ -309,6 +319,7 @@ fun SwipeableUpload(
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }
@@ -330,18 +341,19 @@ fun UploadBox(label: String, image: ImageBitmap?, onClick: () -> Unit, modifier:
         contentAlignment = Alignment.Center,
         modifier = modifier
             .height(120.dp)
-            .width(120.dp)
             .border(1.dp, MaterialTheme.colorScheme.secondary, shape = RoundedCornerShape(8.dp))
             .clickable(enabled = enabled) { if (enabled) onClick() }
+            .padding(8.dp)
     ) {
         if (image != null) {
             Image(
                 bitmap = image,
                 contentDescription = label,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
         } else {
-            Text(text = label)
+            Text(text = label, textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = Color.White)
         }
     }
 }
@@ -352,10 +364,11 @@ fun ActionButtonUpload(label: String, modifier: Modifier = Modifier, color: Colo
         enabled = enabled,
         modifier = modifier
             .height(48.dp)
-            .width(150.dp),
+            .widthIn(min = 120.dp, max = 150.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = color.copy(alpha = 0.5f)
         ),
         shape = RoundedCornerShape(24.dp)
     ) {

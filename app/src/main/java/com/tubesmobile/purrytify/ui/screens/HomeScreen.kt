@@ -430,7 +430,7 @@ fun SideNavigationBar(
             .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 24.dp, horizontal = 12.dp)
     ) {
-        Spacer(Modifier.height(32.dp)) // Space for OS elements like time
+        Spacer(Modifier.height(32.dp))
         SideNavItem(
             text = "Home",
             icon = Icons.Filled.Home,
@@ -440,7 +440,7 @@ fun SideNavigationBar(
         Spacer(Modifier.height(16.dp))
         SideNavItem(
             text = "Your Library",
-            icon = Icons.Filled.LibraryMusic, // Consider a custom icon if needed
+            icon = Icons.Filled.LibraryMusic,
             isSelected = currentScreen == Screen.LIBRARY,
             onClick = { onNavigate(Screen.LIBRARY) }
         )
@@ -590,7 +590,7 @@ fun MainContent(
                 }
             ) {
                 Icon(
-                    imageVector = Icons.Filled.PhotoCamera, // Using Material Icon
+                    imageVector = Icons.Filled.PhotoCamera,
                     contentDescription = "Scan QR Code",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
@@ -694,7 +694,7 @@ fun MainContent(
                 }
             }
         }
-        if (topCountryRecommendations.isNotEmpty() && !isLandscape) { // Example: Show only in portrait or if space allows
+        if (topCountryRecommendations.isNotEmpty() && !isLandscape) {
             Text(
                 text = "Top Country Mix",
                 style = MaterialTheme.typography.titleLarge,
@@ -795,9 +795,9 @@ fun MainContent(
         )
 
         val recentlyPlayedModifier = if (isLandscape) {
-            Modifier.heightIn(max = 375.dp) // Constrain height in landscape
+            Modifier.heightIn(max = 375.dp)
         } else {
-            Modifier.heightIn(max = 375.dp) // Constrain height in landscape
+            Modifier.heightIn(max = 375.dp)
         }
 
         when {
@@ -957,7 +957,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicService: MusicPlayback
                         retriever.setDataSource(context, Uri.parse(song.uri))
                         retriever.embeddedPicture?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
                     }
-                    song.artworkUri.startsWith("http") -> null // Handled by AsyncImage if this were AsyncImage
+                    song.artworkUri.startsWith("http") -> null
                     else -> BitmapFactory.decodeFile(song.artworkUri)?.asImageBitmap()
                 }
             } catch (e: Exception) { null }
@@ -967,13 +967,13 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicService: MusicPlayback
 
     Column(
         modifier = Modifier
-            .width(100.dp) // Slightly wider for better text fit
+            .width(100.dp)
             .clickable { onClick(song) },
-        horizontalAlignment = Alignment.Start // Align content to the start
+        horizontalAlignment = Alignment.Start
     ) {
         Box(
             modifier = Modifier
-                .size(80.dp) // Larger image
+                .size(80.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
@@ -986,7 +986,7 @@ fun NewSongItem(song: Song, onClick: (Song) -> Unit, musicService: MusicPlayback
                     contentScale = ContentScale.Crop
                 )
             } else {
-                AsyncImage( // Fallback for http or if local load fails but could be URL
+                AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(song.artworkUri.ifEmpty { R.drawable.ic_launcher_foreground })
                         .error(R.drawable.ic_launcher_foreground)
@@ -1032,7 +1032,7 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicService: MusicP
                         retriever.setDataSource(context, Uri.parse(song.uri))
                         retriever.embeddedPicture?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
                     }
-                    song.artworkUri.startsWith("http") -> null // Handled by AsyncImage
+                    song.artworkUri.startsWith("http") -> null
                     else -> BitmapFactory.decodeFile(song.artworkUri)?.asImageBitmap()
                 }
             } catch (e: Exception) { null }
@@ -1049,8 +1049,8 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicService: MusicP
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp) // Standard size
-                .clip(RoundedCornerShape(4.dp)) // Slight rounding
+                .size(56.dp)
+                .clip(RoundedCornerShape(4.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
@@ -1129,14 +1129,14 @@ fun RecommendedSongItem(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = song.title,
-            style = MaterialTheme.typography.labelLarge, // Adjusted for clarity
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = song.artist,
-            style = MaterialTheme.typography.labelMedium, // Adjusted for clarity
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
