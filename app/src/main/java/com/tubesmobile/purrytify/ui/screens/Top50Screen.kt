@@ -234,7 +234,7 @@ fun Top50Screen(
                                                 artworkUri = apiSong.artwork
                                             )
                                             musicDbViewModel.updateSongTimestamp(song)
-                                            musicService?.playSong(song, musicDbViewModel, onlineSongsViewModel)
+                                            musicService?.playSong(song, musicDbViewModel)
                                             navController.navigate("music/${Screen.HOME.name}/true/-1")
                                         }
                                     )
