@@ -444,7 +444,7 @@ class MusicPlaybackService : Service() {
                 val playLog = SongPlayLogEntity(
                     songId = songToLog.id,
                     userEmail = userEmail,
-                    playedAtTimestamp = currentSongStartTimeMillis,
+                    playedAtTimestamp = System.currentTimeMillis(),
                     durationListenedMillis = listenedDurationMillis,
                     isLocal = true
                 )
