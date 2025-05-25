@@ -57,6 +57,7 @@ import com.tubesmobile.purrytify.service.PlaybackMode
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,6 +75,7 @@ fun MusicLibraryScreen(
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
+    val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
     val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
@@ -280,7 +282,7 @@ fun MusicLibraryScreen(
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
                                     musicService?.setPlaylist(songsToDisplay)
-                                    musicService?.playSong(selectedSong, musicDbViewModel)
+                                    musicService?.playSong(selectedSong, musicDbViewModel, onlineSongsViewModel)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
@@ -336,7 +338,7 @@ fun MusicLibraryScreen(
                         scope.launch { snackbarHostState.showSnackbar("${song.title} deleted") }
                         if (currentSong?.id == song.id && musicService != null) {
                             if (musicService!!.hasNextSong()) {
-                                musicService!!.playNext(musicDbViewModel)
+                                musicService!!.playNext(musicDbViewModel, onlineSongsViewModel)
                                 scope.launch { snackbarHostState.showSnackbar("Playing next song") }
                             } else {
                                 musicService!!.stopPlayback(musicDbViewModel)

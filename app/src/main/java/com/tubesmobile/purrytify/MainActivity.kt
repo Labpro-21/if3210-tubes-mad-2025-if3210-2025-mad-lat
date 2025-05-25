@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
                             bindService(serviceIntent, object : ServiceConnection {
                                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                                     val binder = service as MusicPlaybackService.MusicPlaybackBinder
-                                    binder.getService().playSong(songData, musicDbViewModel)
+                                    binder.getService().playSong(songData, musicDbViewModel, onlineSongsViewModel)
                                     musicDbViewModel.updateSongTimestamp(songData)
                                     unbindService(this)
                                 }
