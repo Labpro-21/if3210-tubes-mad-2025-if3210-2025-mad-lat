@@ -38,8 +38,8 @@ import com.tubesmobile.purrytify.R
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
 import com.tubesmobile.purrytify.ui.components.SwipeableAudioDeviceDialog
-import com.tubesmobile.purrytify.ui.viewmodel.AudioDevice
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.service.MusicPlaybackService
+import com.tubesmobile.purrytify.service.AudioDevice
 import com.tubesmobile.purrytify.util.generateQRCode
 import com.tubesmobile.purrytify.util.saveBitmapToCache
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 fun MusicScreen(
     navController: NavHostController,
     sourceScreen: Screen,
-    musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicService: MusicPlaybackService?,
     musicDbViewModel: MusicDbViewModel,
     isFromApiSong: Boolean = false,
     songId: Int = -1,
@@ -60,20 +60,20 @@ fun MusicScreen(
     var showShareDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
-    val isPlaying by musicBehaviorViewModel.isPlaying.collectAsState()
-    val position by musicBehaviorViewModel.currentPosition.collectAsState()
-    val duration by musicBehaviorViewModel.duration.collectAsState()
-    val audioError by musicBehaviorViewModel.audioError.collectAsState()
-    val audioDevices by musicBehaviorViewModel.audioDevices.collectAsState()
-    val currentAudioDevice by musicBehaviorViewModel.currentAudioDevice.collectAsState()
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
+    val isPlaying by musicService?.isPlaying?.collectAsState() ?: remember { mutableStateOf(false) }
+    val position by musicService?.currentPosition?.collectAsState() ?: remember { mutableStateOf(0) }
+    val duration by musicService?.duration?.collectAsState() ?: remember { mutableStateOf(0) }
+    val audioError by musicService?.audioError?.collectAsState() ?: remember { mutableStateOf(null) }
+    val audioDevices by musicService?.audioDevices?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
+    val currentAudioDevice by musicService?.currentAudioDevice?.collectAsState() ?: remember { mutableStateOf(null) }
     var isLiked by remember { mutableStateOf(false) }
     var speakerIconPosition by remember { mutableStateOf(Offset(0f, 0f)) }
     val context = LocalContext.current
     val song = currentSong
 
     LaunchedEffect(songId, song) {
-        if (songId != -1 && song?.id != songId) {
+        if (songId != -1 && song?.id != songId && musicService != null) {
             onlineSongsViewModel.loadSongById(songId) { apiSong ->
                 if (apiSong != null) {
                     val song = Song(
@@ -84,7 +84,7 @@ fun MusicScreen(
                         uri = apiSong.url,
                         artworkUri = apiSong.artwork
                     )
-                    musicBehaviorViewModel.playSong(song, context)
+                    musicService.playSong(song)
                     musicDbViewModel.updateSongTimestamp(song)
                 } else {
                     scope.launch {
@@ -102,14 +102,14 @@ fun MusicScreen(
     }
 
     LaunchedEffect(Unit) {
-        musicBehaviorViewModel.initializeAudioRouting(context)
+        musicService?.initializeAudioRouting()
     }
 
     LaunchedEffect(audioError) {
         audioError?.let { error ->
             scope.launch {
                 snackbarHostState.showSnackbar(error)
-                musicBehaviorViewModel.clearAudioError()
+                musicService?.clearAudioError()
             }
         }
     }
@@ -336,7 +336,7 @@ fun MusicScreen(
                     value = if (duration > 0) position.toFloat() / duration else 0f,
                     onValueChange = { newValue ->
                         val newPosition = (newValue * duration).toInt()
-                        musicBehaviorViewModel.seekTo(newPosition)
+                        musicService?.seekTo(newPosition)
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,
@@ -377,14 +377,14 @@ fun MusicScreen(
                     modifier = Modifier
                         .size(26.dp)
                         .clickable {
-                            musicBehaviorViewModel.playPrevious(context)
+                            musicService?.playPrevious()
                         }
                 )
 
                 Box(
                     modifier = Modifier
                         .size(84.dp)
-                        .clickable { musicBehaviorViewModel.togglePlayPause() },
+                        .clickable { musicService?.togglePlayPause() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -402,7 +402,7 @@ fun MusicScreen(
                     modifier = Modifier
                         .size(26.dp)
                         .clickable {
-                            musicBehaviorViewModel.playNext(context)
+                            musicService?.playNext()
                         }
                 )
 
@@ -420,12 +420,12 @@ fun MusicScreen(
                             }
                     )
                     if (showPopup) {
-                        SwipeableAudioDeviceDialog (
+                        SwipeableAudioDeviceDialog(
                             devices = audioDevices,
                             currentDevice = currentAudioDevice,
                             onDismiss = { showPopup = false },
                             onDeviceSelected = { device ->
-                                musicBehaviorViewModel.selectAudioDevice(device, context)
+                                musicService?.selectAudioDevice(device)
                                 showPopup = false
                             }
                         )
@@ -447,6 +447,73 @@ fun MusicScreen(
         }
     }
 }
+
+//@Composable
+//fun ShareDialog(
+//    songId: Int?,
+//    context: Context,
+//    onDismiss: () -> Unit
+//) {
+//    AlertDialog(
+//        onDismissRequest = onDismiss,
+//        title = { Text("Share Song") },
+//        text = {
+//            Column {
+//                Text(
+//                    text = "Share as URL",
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .clickable {
+//                            songId?.let { id ->
+//                                val shareUrl = "purrytify://song/$id"
+//                                val shareIntent = Intent().apply {
+//                                    action = Intent.ACTION_SEND
+//                                    putExtra(Intent.EXTRA_TEXT, shareUrl)
+//                                    type = "text/plain"
+//                                }
+//                                context.startActivity(Intent.createChooser(shareIntent, "Share Song URL"))
+//                            }
+//                            onDismiss()
+//                        }
+//                        .padding(vertical = 8.dp),
+//                    fontSize = 16.sp
+//                )
+//                Text(
+//                    text = "Share as QR Code",
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .clickable {
+//                            songId?.let { id ->
+//                                val shareUrl = "purrytify://song/$id"
+//                                val qrBitmap = generateQRCode(shareUrl, 512, 512)
+//                                if (qrBitmap != null) {
+//                                    val uri = saveBitmapToCache(context, qrBitmap, "song_qr_$id.png")
+//                                    if (uri != null) {
+//                                        val shareIntent = Intent().apply {
+//                                            action = Intent.ACTION_SEND
+//                                            putExtra(Intent.EXTRA_STREAM, uri)
+//                                            type = "image/png"
+//                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//                                        }
+//                                        context.startActivity(Intent.createChooser(shareIntent, "Share Song QR Code"))
+//                                    }
+//                                }
+//                                onDismiss()
+//                            }
+//                        }
+//                        .padding(vertical = 8.dp),
+//                    fontSize = 16.sp
+//                )
+//            }
+//        },
+//        confirmButton = {},
+//        dismissButton = {
+//            TextButton(onClick = onDismiss) {
+//                Text("Cancel")
+//            }
+//        }
+//    )
+//}
 
 @Composable
 fun DeviceDialog(

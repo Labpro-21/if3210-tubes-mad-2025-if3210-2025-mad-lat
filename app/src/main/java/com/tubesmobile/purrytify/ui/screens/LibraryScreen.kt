@@ -1,6 +1,11 @@
 package com.tubesmobile.purrytify.ui.screens
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.BitmapFactory
+import android.os.IBinder
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
@@ -12,8 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
@@ -21,8 +24,14 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -30,33 +39,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
-import com.tubesmobile.purrytify.R
-import com.tubesmobile.purrytify.ui.theme.PurrytifyTheme
-import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
-import com.tubesmobile.purrytify.ui.components.Screen
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tubesmobile.purrytify.R
+import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
+import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.NetworkOfflineScreen
 import com.tubesmobile.purrytify.ui.components.SwipeableUpload
+import com.tubesmobile.purrytify.service.MusicPlaybackService
+import com.tubesmobile.purrytify.service.PlaybackMode
 import com.tubesmobile.purrytify.ui.theme.LocalNetworkStatus
 import com.tubesmobile.purrytify.ui.viewmodel.LoginViewModel
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
-import com.tubesmobile.purrytify.ui.viewmodel.PlaybackMode
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,20 +66,21 @@ import java.io.File
 @Composable
 fun MusicLibraryScreen(
     navController: NavHostController,
-    musicBehaviorViewModel: MusicBehaviorViewModel,
     loginViewModel: LoginViewModel
 ) {
+    val context = LocalContext.current
+    var musicService by remember { mutableStateOf<MusicPlaybackService?>(null) }
+    var isBound by remember { mutableStateOf(false) }
     val currentScreen = remember { mutableStateOf(Screen.LIBRARY) }
     var showPopup by remember { mutableStateOf(false) }
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val songsList by musicDbViewModel.allSongs.collectAsState(initial = emptyList())
     val likedSongsList by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
-    val context = LocalContext.current
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
     var searchQuery by remember { mutableStateOf("") }
-    val playbackMode by musicBehaviorViewModel.playbackMode.collectAsState()
+    val playbackMode by musicService?.playbackMode?.collectAsState() ?: remember { mutableStateOf(PlaybackMode.REPEAT) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val selectedTab by musicBehaviorViewModel.selectedTab.collectAsState()
+    val selectedTab by musicService?.selectedTab?.collectAsState() ?: remember { mutableStateOf("All Songs") }
     val scope = rememberCoroutineScope()
     val isConnected by LocalNetworkStatus.current.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
@@ -88,13 +88,45 @@ fun MusicLibraryScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var songToDelete by remember { mutableStateOf<Song?>(null) }
 
+    // Service connection
+    val connection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as MusicPlaybackService.MusicPlaybackBinder
+                musicService = binder.getService()
+                isBound = true
+                // Initialize audio routing after binding
+                musicService?.initializeAudioRouting()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                musicService = null
+                isBound = false
+            }
+        }
+    }
+
+    // Bind to the service
+    DisposableEffect(Unit) {
+        val intent = Intent(context, MusicPlaybackService::class.java)
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        context.startService(intent) // Ensure service is started for background playback
+
+        onDispose {
+            if (isBound) {
+                context.unbindService(connection)
+                isBound = false
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             Column {
-                if (currentSong != null) {
+                if (currentSong != null && musicService != null) {
                     BottomPlayerBar(
-                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        musicService = musicService!!,
                         navController = navController,
                         fromScreen = Screen.LIBRARY,
                         isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
@@ -153,19 +185,19 @@ fun MusicLibraryScreen(
                 TabButton(
                     text = "All",
                     isSelected = selectedTab == "All Songs",
-                    onClick = { musicBehaviorViewModel.setSelectedTab("All Songs") }
+                    onClick = { musicService?.setSelectedTab("All Songs") }
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 TabButton(
                     text = "Liked",
                     isSelected = selectedTab == "Liked Songs",
-                    onClick = { musicBehaviorViewModel.setSelectedTab("Liked Songs") }
+                    onClick = { musicService?.setSelectedTab("Liked Songs") }
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
                 IconButton(
-                    onClick = { musicBehaviorViewModel.cyclePlaybackMode() },
+                    onClick = { musicService?.cyclePlaybackMode() },
                     modifier = Modifier
                         .size(36.dp)
                         .padding(end = 8.dp)
@@ -246,13 +278,13 @@ fun MusicLibraryScreen(
                             isPlaying = song.uri == currentSong?.uri,
                             onClick = { selectedSong ->
                                 if (selectedSong.uri != currentSong?.uri) {
-                                    musicBehaviorViewModel.setPlaylist(songsToDisplay)
-                                    musicBehaviorViewModel.playSong(selectedSong, context)
+                                    musicService?.setPlaylist(songsToDisplay)
+                                    musicService?.playSong(selectedSong)
                                 }
                                 musicDbViewModel.updateSongTimestamp(selectedSong)
                                 navController.navigate("music/${Screen.LIBRARY.name}/false/-1")
                             },
-                            onAddToQueue = { musicBehaviorViewModel.addToQueue(it) },
+                            onAddToQueue = { musicService?.addToQueue(it) },
                             onEditRequest = {
                                 songToEdit = it
                                 showEditDialog = true
@@ -301,12 +333,12 @@ fun MusicLibraryScreen(
                         showDeleteConfirmDialog = false
                         songToDelete = null
                         scope.launch { snackbarHostState.showSnackbar("${song.title} deleted") }
-                        if (currentSong?.id == song.id) {
-                            if (musicBehaviorViewModel.hasNextSong()) {
-                                musicBehaviorViewModel.playNext(context)
+                        if (currentSong?.id == song.id && musicService != null) {
+                            if (musicService!!.hasNextSong()) {
+                                musicService!!.playNext()
                                 scope.launch { snackbarHostState.showSnackbar("Playing next song") }
                             } else {
-                                musicBehaviorViewModel.stopPlayback()
+                                musicService!!.stopPlayback()
                                 scope.launch { snackbarHostState.showSnackbar("Playback stopped - song was deleted") }
                             }
                         }

@@ -38,7 +38,7 @@ import com.tubesmobile.purrytify.service.DataKeeper
 import com.tubesmobile.purrytify.ui.components.BottomPlayerBar
 import com.tubesmobile.purrytify.ui.components.Screen
 import com.tubesmobile.purrytify.ui.components.SharedBottomNavigationBar
-import com.tubesmobile.purrytify.ui.viewmodel.MusicBehaviorViewModel
+import com.tubesmobile.purrytify.service.MusicPlaybackService
 import com.tubesmobile.purrytify.util.generateQRCode
 import com.tubesmobile.purrytify.util.saveBitmapToCache
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
@@ -49,14 +49,14 @@ import android.content.Intent
 @Composable
 fun Top50Screen(
     navController: NavHostController,
-    musicBehaviorViewModel: MusicBehaviorViewModel,
+    musicService: MusicPlaybackService?,
     type: String // "global" or "country"
 ) {
     val context = LocalContext.current
     val musicDbViewModel: MusicDbViewModel = viewModel()
     val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
     val currentScreen = Screen.HOME
-    val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
+    val currentSong by musicService?.currentSong?.collectAsState() ?: remember { mutableStateOf(null) }
     val onlineGlobalSongs by onlineSongsViewModel.onlineGlobalSongs.collectAsState()
     val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
@@ -83,9 +83,9 @@ fun Top50Screen(
     Scaffold(
         bottomBar = {
             Column {
-                if (currentSong != null) {
+                if (currentSong != null && musicService != null) {
                     BottomPlayerBar(
-                        musicBehaviorViewModel = musicBehaviorViewModel,
+                        musicService = musicService,
                         navController = navController,
                         fromScreen = Screen.HOME,
                         isFromApiSong = currentSong?.artworkUri?.startsWith("http") == true
@@ -224,7 +224,7 @@ fun Top50Screen(
                                         artworkUri = apiSong.artwork
                                     )
                                     musicDbViewModel.updateSongTimestamp(song)
-                                    musicBehaviorViewModel.playSong(song, context)
+                                    musicService?.playSong(song)
                                     navController.navigate("music/${Screen.HOME.name}/true/-1")
                                 }
                             )
