@@ -66,6 +66,7 @@ import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.style.TextOverflow
+import com.tubesmobile.purrytify.data.model.ApiSong
 
 @Composable
 fun HomeScreen(
@@ -423,7 +424,7 @@ fun HomeScreen(
                     items(recommendedBasedOnLikes, key = { song -> "liked_${song.id}_${song.uri}" }) { song ->
                         RecommendedSongItem(song = song, onClick = { selectedSong ->
                             Log.d("HomeScreen", "Playing from 'Based on Likes': ${selectedSong.title}")
-                            musicBehaviorViewModel.playSong(selectedSong, context)
+                            musicService!!.playSong(selectedSong)
                             val isApi = selectedSong.uri.startsWith("http")
                             navController.navigate("music/${Screen.HOME.name}/${isApi}/${selectedSong.id ?: -1}")
                         })
@@ -448,7 +449,7 @@ fun HomeScreen(
                     items(topGlobalRecommendations, key = { song -> "global_${song.id}_${song.uri}" }) { song ->
                         RecommendedSongItem(song = song, onClick = { selectedSong ->
                             Log.d("HomeScreen", "Playing from 'Top Global Mix': ${selectedSong.title}")
-                            musicBehaviorViewModel.playSong(selectedSong, context)
+                            musicService!!.playSong(selectedSong)
                             navController.navigate("music/${Screen.HOME.name}/true/${selectedSong.id ?: -1}")
                         })
                     }
