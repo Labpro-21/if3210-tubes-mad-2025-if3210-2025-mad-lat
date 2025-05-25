@@ -95,6 +95,12 @@ interface SongDao {
 
     // Song PLay Log
 
+    @Query("""
+        SELECT MIN(playedAtTimestamp) FROM song_play_log
+        WHERE userEmail = :userEmail AND isLocal = 1 AND playedAtTimestamp > 0 
+    """) // Added playedAtTimestamp > 0 to ignore faulty zero entries
+    fun getEarliestPlayLogTimestampForUser(userEmail: String): Flow<Long?>
+
     @Insert
     suspend fun insertSongPlayLog(playLog: SongPlayLogEntity): Long
 
