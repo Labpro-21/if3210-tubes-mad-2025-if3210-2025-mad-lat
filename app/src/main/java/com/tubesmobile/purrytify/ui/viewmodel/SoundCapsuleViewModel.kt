@@ -2,7 +2,9 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
@@ -11,6 +13,7 @@ import com.tubesmobile.purrytify.data.model.ArtistData
 import com.tubesmobile.purrytify.data.model.MonthlySoundCapsuleData
 import com.tubesmobile.purrytify.data.model.SongData
 import com.tubesmobile.purrytify.service.DataKeeper
+import com.tubesmobile.purrytify.util.PdfGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +54,26 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             Log.e("SoundCapsuleVM", "User email is blank on update, cannot load capsules.")
             _monthlyCapsules.value = createEmptyOrErrorCapsuleList("Error: User not logged in")
             _isLoading.value = false
+        }
+    }
+
+    fun exportCapsuleToPdf(context: Context, capsuleData: MonthlySoundCapsuleData, username: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val success = PdfGenerator.generateCapsulePdf(context, capsuleData, username)
+                withContext(Dispatchers.Main) {
+                    if (success) {
+                        Toast.makeText(context, "PDF saved to Downloads folder.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Failed to generate PDF.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SoundCapsuleVM", "Error generating PDF", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
