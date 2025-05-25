@@ -4,11 +4,13 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +65,9 @@ import com.tubesmobile.purrytify.ui.viewmodel.QrScanViewModel
 import com.tubesmobile.purrytify.ui.viewmodel.ProfileViewModel.ProfileState
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
 import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun HomeScreen(
@@ -92,6 +97,13 @@ fun HomeScreen(
     val baseUrl = "http://34.101.226.132:3000"
     var dynamicProfilePhotoUrl by remember { mutableStateOf<String?>(null) }
     var showPermissionDeniedDialog by remember { mutableStateOf(false) }
+    val likedSongs by musicDbViewModel.likedSongs.collectAsState(initial = emptyList())
+    var recommendedBasedOnLikes by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var topGlobalRecommendations by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var topCountryRecommendations by remember { mutableStateOf<List<Song>>(emptyList()) }
+    val onlineGlobalSongsApi by onlineSongsViewModel.onlineGlobalSongs.collectAsState() // List<ApiSong>
+    val onlineCountrySongsApi by onlineSongsViewModel.onlineCountrySongs.collectAsState() // List<ApiSong>
+
 
     // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -124,6 +136,34 @@ fun HomeScreen(
             Log.w("HomeScreen", "No QR scan result or contents found (launcher)")
             qrScanViewModel.setScanResult(null)
         }
+    }
+
+    LaunchedEffect(likedSongs, songsList, onlineGlobalSongsApi, onlineCountrySongsApi) {
+        val mappedOnlineGlobalSongs = onlineGlobalSongsApi.map { it.toSong() }
+        val mappedOnlineCountrySongs = onlineCountrySongsApi.map { it.toSong() }
+
+        // 1. Rekomendasi berdasarkan lagu yang disukai
+        if (likedSongs.isNotEmpty()) {
+            val likedArtists = likedSongs.map { it.artist.lowercase() }.distinct().toSet()
+
+            // Gabungkan lagu lokal dan online (yang sudah di-map ke tipe Song)
+            val allAvailableSongs = (songsList + mappedOnlineGlobalSongs + mappedOnlineCountrySongs)
+                .distinctBy { it.uri }
+
+            recommendedBasedOnLikes = allAvailableSongs.filter { song ->
+                val songArtistLower = song.artist.lowercase() // song is now of type Song
+                !likedSongs.any { likedSong -> likedSong.uri == song.uri } &&
+                        (likedArtists.contains(songArtistLower))
+            }.shuffled().take(10)
+        } else {
+            recommendedBasedOnLikes = mappedOnlineGlobalSongs.shuffled().take(5)
+        }
+
+        // 2. Rekomendasi "Top Global"
+        topGlobalRecommendations = mappedOnlineGlobalSongs.take(10) // <<< Now List<Song>
+
+        // 3. Rekomendasi "Top Country"
+        topCountryRecommendations = mappedOnlineCountrySongs.take(10) // <<< Now List<Song>
     }
 
     // Handle scan result from ViewModel
@@ -227,6 +267,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             Row(
@@ -275,8 +316,7 @@ fun HomeScreen(
 
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -344,25 +384,75 @@ fun HomeScreen(
                 }
                 else -> {
                     LazyRow(
-                        modifier = Modifier.padding(bottom = 16.dp),
+                        modifier = Modifier.padding(bottom = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
                             ChartItem(
                                 title = "Top 50",
                                 subtitle = "GLOBAL",
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                drawableResId = R.drawable.trump,
                                 onClick = { navController.navigate("top50/global") }
                             )
                         }
                         item {
+                            val locationSubtitle = DataKeeper.location?.takeIf { it.isNotBlank() } ?: "Country"
                             ChartItem(
                                 title = "Top 10",
-                                subtitle = "${DataKeeper.location}",
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                subtitle = locationSubtitle.uppercase(),
+                                drawableResId = R.drawable.prabowo,
                                 onClick = { navController.navigate("top50/country") }
                             )
                         }
+                    }
+                }
+            }
+
+            // 1. Rekomendasi Berdasarkan Lagu yang Disukai
+            if (recommendedBasedOnLikes.isNotEmpty()) {
+                Text(
+                    text = "Based on Your Likes",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 12.dp) // Jarak
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(end = 8.dp) // Agar item terakhir tidak terpotong
+                ) {
+                    items(recommendedBasedOnLikes, key = { song -> "liked_${song.id}_${song.uri}" }) { song ->
+                        RecommendedSongItem(song = song, onClick = { selectedSong ->
+                            Log.d("HomeScreen", "Playing from 'Based on Likes': ${selectedSong.title}")
+                            musicBehaviorViewModel.playSong(selectedSong, context)
+                            val isApi = selectedSong.uri.startsWith("http")
+                            navController.navigate("music/${Screen.HOME.name}/${isApi}/${selectedSong.id ?: -1}")
+                        })
+                    }
+                }
+            }
+
+            // 2. Rekomendasi Top Global
+            if (topGlobalRecommendations.isNotEmpty()) {
+                Text(
+                    text = "Top Global Mix",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(end = 8.dp)
+                ) {
+                    items(topGlobalRecommendations, key = { song -> "global_${song.id}_${song.uri}" }) { song ->
+                        RecommendedSongItem(song = song, onClick = { selectedSong ->
+                            Log.d("HomeScreen", "Playing from 'Top Global Mix': ${selectedSong.title}")
+                            musicBehaviorViewModel.playSong(selectedSong, context)
+                            navController.navigate("music/${Screen.HOME.name}/true/${selectedSong.id ?: -1}")
+                        })
                     }
                 }
             }
@@ -372,7 +462,7 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
             )
 
             when {
@@ -518,34 +608,55 @@ fun HomeScreen(
 fun ChartItem(
     title: String,
     subtitle: String,
-    color: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit
+    imagePath: String? = null,
+    @DrawableRes drawableResId: Int? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
+    val imageData: Any = drawableResId
+        ?: imagePath?.takeIf { it.isNotBlank() }
+        ?: R.drawable.ic_launcher_foreground
+
     Column(
-        modifier = Modifier
-            .width(100.dp)
-            .clickable { onClick() }
-            .background(color, RoundedCornerShape(12.dp))
-            .padding(8.dp),
+        modifier = modifier
+            .width(150.dp)
+            .clickable(onClick = onClick)
+            .padding(bottom = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(imageData)
+                .crossfade(true)
+                .build(),
+            contentDescription = "Chart: $title - $subtitle",
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
             text = title,
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleSmall.copy(fontSize = 21.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
         Text(
-            text = subtitle,
-            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
-            fontSize = 12.sp
-        )
-        Text(
-            text = "",
-            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-            fontSize = 10.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp)
+            text = subtitle.uppercase(),
+            style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
@@ -555,6 +666,17 @@ private fun parseDurationToMillis(duration: String): Long {
     val minutes = parts[0].toLongOrNull() ?: 0L
     val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
     return (minutes * 60 + seconds) * 1000
+}
+
+fun ApiSong.toSong(): Song {
+    return Song(
+        id = this.id,
+        title = this.title,
+        artist = this.artist ?: "Unknown Artist",
+        duration = parseDurationToMillis(this.duration),
+        uri = this.url,
+        artworkUri = this.artwork ?: ""
+    )
 }
 
 @Composable
@@ -703,6 +825,50 @@ fun RecentlyPlayedItem(song: Song, onClick: (Song) -> Unit, musicBehaviorViewMod
                 fontSize = 14.sp
             )
         }
+    }
+}
+
+@Composable
+fun RecommendedSongItem(
+    song: Song,
+    onClick: (Song) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    Column(
+        modifier = modifier
+            .width(110.dp)
+            .clickable { onClick(song) }
+            .padding(bottom = 8.dp)
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(song.artworkUri.ifEmpty { R.drawable.ic_launcher_foreground }) // Fallback jika artworkUri kosong
+                .crossfade(true)
+                .build(),
+            contentDescription = song.title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
+        Text(
+            text = song.artist,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
     }
 }
 
