@@ -17,8 +17,10 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.tubesmobile.purrytify.data.local.db.entities.SongPlayLogEntity
+import com.tubesmobile.purrytify.data.model.ApiSong
 import com.tubesmobile.purrytify.ui.screens.Song
 import com.tubesmobile.purrytify.viewmodel.MusicDbViewModel
+import com.tubesmobile.purrytify.viewmodel.OnlineSongsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -340,7 +342,7 @@ class MusicPlaybackService : Service() {
         }
     }
 
-    fun playSong(song: Song, musicDbViewModel: MusicDbViewModel) {
+    fun playSong(song: Song, musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         if (!isValidSong(song)) {
             _audioError.value = "Invalid song data"
             return
@@ -384,7 +386,7 @@ class MusicPlaybackService : Service() {
                     }
                 }
                 setOnCompletionListener {
-                    playNext(musicDbViewModel)
+                    playNext(musicDbViewModel, onlineSongsViewModel)
                 }
                 setOnErrorListener { _, what, extra ->
                     _isPlaying.value = false
@@ -510,57 +512,116 @@ class MusicPlaybackService : Service() {
         _playlist.addAll(songs.filter { isValidSong(it) })
     }
 
-    fun playNext(musicDbViewModel: MusicDbViewModel) {
+    fun playNext(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         logCurrentSongPlayDuration(musicDbViewModel)
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
-            playSong(nextFromQueue, musicDbViewModel)
+            playSong(nextFromQueue, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNextFromPlaylist(musicDbViewModel)
+            playNextFromPlaylist(musicDbViewModel, onlineSongsViewModel)
         }
     }
 
-    private fun playNextFromPlaylist(musicDbViewModel: MusicDbViewModel) {
+    private fun playNextFromPlaylist(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         val list = _playlist
-        if (list.isEmpty()) return
+
+        val currentSongId = _currentSong.value?.id
+        var songList = onlineSongsViewModel.onlineGlobalSongs.value
+        var currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+
+        var nextSongIndex = -1
+        var nextSong = ApiSong(0,"","","","","","",0,"","")
+
+        if (currentSongIndex == -1) { // song not in global but in country
+            songList = onlineSongsViewModel.onlineCountrySongs.value
+            currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+        }
+
+        if (currentSongIndex != -1){ // song is in global or country (else skip this section)
+            nextSongIndex = if (currentSongIndex + 1 >= songList.size) 0 else currentSongIndex + 1
+            nextSong = songList[nextSongIndex]
+
+            val song = Song(
+                id = nextSong.id,
+                title = nextSong.title,
+                artist = nextSong.artist,
+                uri = nextSong.url,
+                duration = parseDurationToMillis(nextSong.duration),
+                artworkUri = nextSong.artwork
+            )
+            currentIndex = _playlist.indexOfFirst { it.id == nextSong.id }
+            if (currentIndex == -1) currentIndex = 0
+            playSong(song, musicDbViewModel, onlineSongsViewModel)
+            return
+        }
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it, musicDbViewModel) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel, onlineSongsViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex], musicDbViewModel)
+                    playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = (currentIndex + 1) % list.size
-                playSong(list[currentIndex], musicDbViewModel)
+                playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
             }
         }
     }
 
-    fun playPrevious(musicDbViewModel: MusicDbViewModel) {
+    fun playPrevious(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         logCurrentSongPlayDuration(musicDbViewModel)
+
         val list = _playlist
-        if (list.isEmpty()) return
+
+        val currentSongId = _currentSong.value?.id
+        var songList = onlineSongsViewModel.onlineGlobalSongs.value
+        var currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+
+        var prevSongIndex = -1
+        var prevSong = ApiSong(0,"","","","","","",0,"","")
+
+        if (currentSongIndex == -1) { // song not in global but in country
+            songList = onlineSongsViewModel.onlineCountrySongs.value
+            currentSongIndex = songList.indexOfFirst { it.id == currentSongId }
+        }
+
+        if (currentSongIndex != -1){ // song is in global or country (else skip this section)
+            prevSongIndex = if (currentSongIndex <= 0) songList.size - 1 else currentSongIndex - 1
+            prevSong = songList[prevSongIndex]
+
+            val song = Song(
+                id = prevSong.id,
+                title = prevSong.title,
+                artist = prevSong.artist,
+                uri = prevSong.url,
+                duration = parseDurationToMillis(prevSong.duration),
+                artworkUri = prevSong.artwork
+            )
+            currentIndex = _playlist.indexOfFirst { it.id == prevSong.id }
+            if (currentIndex == -1) currentIndex = 0
+            playSong(song, musicDbViewModel, onlineSongsViewModel)
+            return
+        }
 
         when (_playbackMode.value) {
             PlaybackMode.REPEAT_ONE -> {
-                _currentSong.value?.let { playSong(it, musicDbViewModel) }
+                _currentSong.value?.let { playSong(it, musicDbViewModel, onlineSongsViewModel) }
             }
             PlaybackMode.SHUFFLE -> {
                 val indices = list.indices - currentIndex
                 if (indices.isNotEmpty()) {
                     currentIndex = indices.random()
-                    playSong(list[currentIndex], musicDbViewModel)
+                    playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
                 }
             }
             PlaybackMode.REPEAT -> {
                 currentIndex = if (currentIndex <= 0) list.size - 1 else currentIndex - 1
-                playSong(list[currentIndex], musicDbViewModel)
+                playSong(list[currentIndex], musicDbViewModel, onlineSongsViewModel)
             }
         }
     }
@@ -579,21 +640,21 @@ class MusicPlaybackService : Service() {
         }
     }
 
-    fun playNextFromQueue(musicDbViewModel: MusicDbViewModel) {
+    fun playNextFromQueue(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong, musicDbViewModel)
+            playSong(nextSong, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNext(musicDbViewModel)
+            playNext(musicDbViewModel, onlineSongsViewModel)
         }
     }
 
-    fun playOrQueueNext(musicDbViewModel: MusicDbViewModel) {
+    fun playOrQueueNext(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
         if (_queue.isNotEmpty()) {
             val nextSong = _queue.removeAt(0)
-            playSong(nextSong, musicDbViewModel)
+            playSong(nextSong, musicDbViewModel, onlineSongsViewModel)
         } else {
-            playNext(musicDbViewModel)
+            playNext(musicDbViewModel, onlineSongsViewModel)
         }
     }
 
@@ -641,4 +702,11 @@ class MusicPlaybackService : Service() {
     private fun isValidSong(song: Song): Boolean {
         return song.uri.isNotBlank() && song.title.isNotBlank() && song.artist.isNotBlank()
     }
+}
+
+private fun parseDurationToMillis(duration: String): Long {
+    val parts = duration.split(":")
+    val minutes = parts[0].toLongOrNull() ?: 0L
+    val seconds = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+    return (minutes * 60 + seconds) * 1000
 }
