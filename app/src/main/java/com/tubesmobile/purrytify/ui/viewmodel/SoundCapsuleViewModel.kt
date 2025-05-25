@@ -204,7 +204,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun createEmptyOrErrorCapsuleList(monthYearText: String): List<MonthlySoundCapsuleData> {
-        // Menggunakan konstruktor default MonthlySoundCapsuleData yang menyediakan nilai default untuk field yang nullable
         return listOf(
             MonthlySoundCapsuleData(
                 monthYear = monthYearText,
@@ -212,7 +211,7 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                 dailyAverageMinutes = null,
                 topArtistName = null,
                 topArtistImageUrl = null,
-                totalArtistsListenedThisMonth = null, // Sesuai model, default 0, tapi null lebih baik untuk "tidak ada data"
+                totalArtistsListenedThisMonth = null,
                 topArtistsList = null,
                 topSongName = null,
                 topSongImageUrl = null,

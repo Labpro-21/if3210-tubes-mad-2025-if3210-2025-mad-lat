@@ -108,7 +108,7 @@ object PdfGenerator {
                 drawTextWithMaxWidth("Daily Average: $it minutes", canvas, smallTextPaint, MARGIN, currentY, contentWidth)
                 currentY += smallTextPaint.textSize * LINE_SPACING_MULTIPLIER
             }
-            currentY += textPaint.textSize // Extra space
+            currentY += textPaint.textSize
         }
 
         if (capsule.topArtistName != null) {
@@ -234,7 +234,7 @@ object PdfGenerator {
         y: Float,
         maxWidth: Float,
         alignment: Layout.Alignment = Layout.Alignment.ALIGN_NORMAL,
-        returnActualY: Boolean = false // If true, returns Y after this text block
+        returnActualY: Boolean = false
     ): Float {
         val staticLayout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth.toInt())
             .setAlignment(alignment)
@@ -246,17 +246,17 @@ object PdfGenerator {
         canvas.translate(x, y)
         staticLayout.draw(canvas)
         canvas.restore()
-        return if (returnActualY) y + staticLayout.height else y // Return original y if not specified
+        return if (returnActualY) y + staticLayout.height else y
     }
 
     private suspend fun loadImage(context: Context, url: String, targetWidth: Int = 100, targetHeight: Int = 100, isCircle: Boolean = false): Bitmap? {
         return try {
             val requestBuilder = ImageRequest.Builder(context)
                 .data(url)
-                .size(targetWidth, targetHeight) // Resize for PDF to save memory
-                .allowHardware(false) // Important for drawing on Canvas
-                .placeholder(R.drawable.ic_launcher_foreground) // Your placeholder
-                .error(R.drawable.ic_launcher_foreground) // Your error placeholder
+                .size(targetWidth, targetHeight)
+                .allowHardware(false)
+                .placeholder(R.drawable.ic_launcher_foreground)
+                .error(R.drawable.ic_launcher_foreground)
 
             if (isCircle) {
                 requestBuilder.transformations(CircleCropTransformation())
@@ -280,7 +280,6 @@ object PdfGenerator {
             }
         } catch (e: Exception) {
             Log.e("PdfGenerator", "Failed to load image: $url", e)
-            // Return a placeholder bitmap on error
             BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_foreground)
         }
     }
