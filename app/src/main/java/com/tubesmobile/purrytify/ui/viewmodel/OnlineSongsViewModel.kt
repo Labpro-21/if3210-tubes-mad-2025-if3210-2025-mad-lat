@@ -38,12 +38,23 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
             _isLoading.value = true
             try {
                 val response = RetrofitClient.apiService.getTopGlobalSongs("Bearer $token")
-                Log.d("homescreen kocok", "hasil response global song ${response.body()}")
                 if (response.isSuccessful) {
                     _onlineGlobalSongs.value = response.body() ?: emptyList()
                     _error.value = null
                 } else {
-                    _error.value = "Failed to fetch global songs: ${response.message()}"
+                    if (response.code() == 401 || response.code() == 403) {
+                        _error.value = "Token expired. Attempting to refresh..."
+                        val refreshResult = tokenManager.refreshToken()
+                        if (refreshResult.isSuccess) {
+                            fetchOnlineGlobalSongs(tokenManager) // Retry with new token
+                            return@launch
+                        } else {
+                            _error.value = "Token expired and refresh failed."
+                            tokenManager.clearTokens()
+                        }
+                    } else {
+                        _error.value = "Failed to fetch global songs: ${response.message()} (Code: ${response.code()})"
+                    }
                 }
             } catch (e: IOException) {
                 _error.value = "Network error: ${e.message}"
@@ -52,26 +63,36 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
             } catch (e: Exception) {
                 _error.value = "Unexpected error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                if (_error.value?.contains("Attempting to refresh...") != true) {
+                    _isLoading.value = false
+                }
             }
         }
     }
 
-
     fun fetchOnlineCountrySongs(tokenManager: TokenManager) {
-        Log.d("kocokmeong2", "location sblm fetch $location dan ${DataKeeper.location}")
         val token = tokenManager.getToken()
-        Log.d("kocokmeong2", "location sblm fetch $location dan ${DataKeeper.location}")
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val response = RetrofitClient.apiService.getTopCountrySongs("Bearer $token", location.toString())
-                Log.d("homescreen kocok", "hasil response country song ${response.body()}")
                 if (response.isSuccessful) {
                     _onlineCountrySongs.value = response.body() ?: emptyList()
                     _error.value = null
                 } else {
-                    _error.value = "Failed to fetch global songs: ${response.message()}"
+                    if (response.code() == 401 || response.code() == 403) {
+                        _error.value = "Token expired. Attempting to refresh..."
+                        val refreshResult = tokenManager.refreshToken()
+                        if (refreshResult.isSuccess) {
+                            fetchOnlineCountrySongs(tokenManager) // Retry with new token
+                            return@launch
+                        } else {
+                            _error.value = "Token expired and refresh failed."
+                            tokenManager.clearTokens()
+                        }
+                    } else {
+                        _error.value = "Failed to fetch country songs: ${response.message()} (Code: ${response.code()})"
+                    }
                 }
             } catch (e: IOException) {
                 _error.value = "Network error: ${e.message}"
@@ -80,15 +101,14 @@ class OnlineSongsViewModel(application: android.app.Application) : AndroidViewMo
             } catch (e: Exception) {
                 _error.value = "Unexpected error: ${e.message}"
             } finally {
-                _isLoading.value = false
+                if (_error.value?.contains("Attempting to refresh...") != true) {
+                    _isLoading.value = false
+                }
             }
         }
     }
 
     fun loadSongById(songId: Int, callback: (ApiSong?) -> Unit) {
-        Log.d("kocokmeong2", "di vm isi global ${onlineGlobalSongs.value}")
-        Log.d("kocokmeong2", "di vm isi country ${onlineCountrySongs.value}")
-        Log.d("kocokmeong2", "isi location ${DataKeeper.location}")
         viewModelScope.launch {
             try {
                 val song = _onlineGlobalSongs.value.find { it.id == songId }

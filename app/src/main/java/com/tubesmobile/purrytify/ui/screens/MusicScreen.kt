@@ -73,7 +73,6 @@ fun MusicScreen(
     val song = currentSong
 
     LaunchedEffect(songId, song) {
-        Log.d("homescreen kocok", "id nya yg lagi main $songId")
         if (songId != -1 && song?.id != songId) {
             onlineSongsViewModel.loadSongById(songId) { apiSong ->
                 if (apiSong != null) {

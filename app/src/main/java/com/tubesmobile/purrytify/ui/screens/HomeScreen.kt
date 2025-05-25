@@ -83,8 +83,6 @@ fun HomeScreen(
     val currentSong by musicBehaviorViewModel.currentSong.collectAsState()
     val onlineGlobalSongs by onlineSongsViewModel.onlineGlobalSongs.collectAsState()
     val onlineCountrySongs by onlineSongsViewModel.onlineCountrySongs.collectAsState()
-    Log.d("kocokmeong", "isi global song $onlineGlobalSongs")
-    Log.d("kocokmeong", "isi country song $onlineCountrySongs")
     val isLoadingSongs by musicDbViewModel.isLoadingSongs.collectAsState()
     val songsError by musicDbViewModel.songsError.collectAsState()
     val isLoadingOnlineSongs by onlineSongsViewModel.isLoading.collectAsState()
