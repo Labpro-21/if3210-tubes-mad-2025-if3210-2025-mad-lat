@@ -3,8 +3,10 @@ package com.tubesmobile.purrytify.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,17 +88,16 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ALBUM COVERS GRID
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 )
 
-                // LOGO AND APP TITLE
                 Image(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "Purrytify Logo",
@@ -121,7 +122,6 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // EMAIL INPUT
                 Text(
                     text = "Email",
                     fontWeight = FontWeight.Bold,
@@ -170,7 +170,6 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                         .padding(bottom = 8.dp)
                 )
 
-                // PASSWORD INPUT WITH TOGGLE VISIBILITY
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -225,7 +224,6 @@ fun LoginScreen(navController: NavHostController, loginViewModel: LoginViewModel
                     NetworkOfflineScreen(0)
                 }
 
-                // LOGIN BUTTON
                 Button(
                     onClick = {
                         if (isEmailValid && isPasswordValid && isConnected) {
