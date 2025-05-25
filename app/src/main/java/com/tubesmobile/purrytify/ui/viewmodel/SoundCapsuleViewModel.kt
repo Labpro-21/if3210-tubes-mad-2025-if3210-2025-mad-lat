@@ -2,40 +2,52 @@
 package com.tubesmobile.purrytify.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tubesmobile.purrytify.data.local.db.AppDatabase
 import com.tubesmobile.purrytify.data.local.db.SongDao
-import com.tubesmobile.purrytify.data.model.ArtistData // Model Anda
-import com.tubesmobile.purrytify.data.model.MonthlySoundCapsuleData // Model Anda
-import com.tubesmobile.purrytify.data.model.SongData // Model Anda
+import com.tubesmobile.purrytify.data.model.ArtistData
+import com.tubesmobile.purrytify.data.model.MonthlySoundCapsuleData
+import com.tubesmobile.purrytify.data.model.SongData
 import com.tubesmobile.purrytify.service.DataKeeper
+import com.tubesmobile.purrytify.util.PdfGenerator
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
+data class DailyChartData(
+    val day: Int,
+    val minutesListened: Int,
+    val label: String
+)
+
 class SoundCapsuleViewModel(application: Application) : AndroidViewModel(application) {
     private val songDao: SongDao = AppDatabase.getDatabase(application).songDao()
     private var currentUserEmail = DataKeeper.email ?: ""
+
+    private val _dailyChartData = MutableStateFlow<List<DailyChartData>>(emptyList())
+    val dailyChartData: StateFlow<List<DailyChartData>> = _dailyChartData
 
     private val _monthlyCapsules = MutableStateFlow<List<MonthlySoundCapsuleData>>(emptyList())
     val monthlyCapsules: StateFlow<List<MonthlySoundCapsuleData>> = _monthlyCapsules
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _isLoadingDailyChart = MutableStateFlow(false)
+    val isLoadingDailyChart: StateFlow<Boolean> = _isLoadingDailyChart
 
     init {
         if (DataKeeper.email != null && DataKeeper.email!!.isNotBlank()) {
@@ -58,6 +70,68 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun loadDailyChartDataForCapsule(capsule: MonthlySoundCapsuleData?) {
+        if (capsule == null || currentUserEmail.isBlank()) {
+            _dailyChartData.value = emptyList()
+            return
+        }
+        _isLoadingDailyChart.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val calendar = Calendar.getInstance(TimeZone.getDefault())
+                val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                try {
+                    calendar.time = sdf.parse(capsule.monthYear) ?: Date()
+                } catch (e: Exception) {
+                    Log.e("SoundCapsuleVM", "Failed to parse monthYear for daily chart: ${capsule.monthYear}", e)
+                }
+
+                val (startTime, endTime) = getMonthStartAndEndTimestamps(calendar)
+
+                val rawDailyData = songDao.getDailyPlayDurationsInMonth(currentUserEmail, startTime, endTime)
+
+                val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val chartDataList = mutableListOf<DailyChartData>()
+
+                val dataMap = rawDailyData.associateBy { it.dayOfMonth }
+
+                for (day in 1..daysInMonth) {
+                    val durationMillis = dataMap[day]?.totalDurationMillis ?: 0L
+                    val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
+                    chartDataList.add(DailyChartData(day, minutes, day.toString()))
+                }
+                _dailyChartData.value = chartDataList
+            } catch (e: Exception) {
+                Log.e("SoundCapsuleVM", "Error loading daily chart data", e)
+                _dailyChartData.value = emptyList()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    _isLoadingDailyChart.value = false
+                }
+            }
+        }
+    }
+
+    fun exportCapsuleToPdf(context: Context, capsuleData: MonthlySoundCapsuleData, username: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val success = PdfGenerator.generateCapsulePdf(context, capsuleData, username)
+                withContext(Dispatchers.Main) {
+                    if (success) {
+                        Toast.makeText(context, "PDF saved to Downloads folder.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, "Failed to generate PDF.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SoundCapsuleVM", "Error generating PDF", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     fun loadSoundCapsuleData() {
         if (currentUserEmail.isBlank()) {
             Log.e("SoundCapsuleVM", "User email is blank in loadSoundCapsuleData, aborting.")
@@ -75,17 +149,8 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
             if (earliestTimestamp == null || earliestTimestamp == 0L) {
                 Log.i("SoundCapsuleVM", "No valid play logs found for user $currentUserEmail. Displaying limited/no capsules.")
-                for (i in 0..2) {
-                    val monthCalendar = Calendar.getInstance(TimeZone.getDefault())
-                    monthCalendar.add(Calendar.MONTH, -i)
-                    val monthYearStr = String.format(
-                        Locale.getDefault(),
-                        "%tB %tY",
-                        monthCalendar,
-                        monthCalendar
-                    )
-                    val (startTime, endTime) = getMonthStartAndEndTimestamps(monthCalendar)
-                    capsules.add(generateCapsuleForMonth(currentUserEmail, monthYearStr, startTime, endTime))
+                if (_monthlyCapsules.value.isEmpty() || _monthlyCapsules.value.first().monthYear.startsWith("Error")) {
+                    _monthlyCapsules.value = createEmptyOrErrorCapsuleList("No listening history found.")
                 }
             } else {
                 val firstLogCalendar = Calendar.getInstance(TimeZone.getDefault())
@@ -151,15 +216,14 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                 topArtistsList = null,
                 topSongName = null,
                 topSongImageUrl = null,
-                totalSongsPlayedThisMonth = null, // Sesuai model, default 0, tapi null lebih baik
+                totalSongsPlayedThisMonth = null,
                 topSongsList = null,
-                dayStreakCount = null, // Sesuai model, default 0, tapi null lebih baik
+                dayStreakCount = null,
                 dayStreakSongName = null,
                 dayStreakSongArtist = null,
                 dayStreakFullText = null,
                 dayStreakDateRange = null,
                 dayStreakImage = null
-                // hasData akan dievaluasi berdasarkan nullability field di atas
             )
         )
     }
@@ -178,7 +242,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
 
         if (playLogsInMonth.isEmpty()) {
             Log.d("SoundCapsuleVM", "No play logs for $monthYear ($userEmail)")
-            // Return MonthlySoundCapsuleData with all nullable fields as null, hasData will be false
             return@withContext MonthlySoundCapsuleData(monthYear = monthYear, timeListenedMinutes = null, dailyAverageMinutes = null, topArtistName = null, topArtistImageUrl = null, totalArtistsListenedThisMonth = null, topArtistsList = null, topSongName = null, topSongImageUrl = null, totalSongsPlayedThisMonth = null, topSongsList = null, dayStreakCount = null, dayStreakSongName = null, dayStreakSongArtist = null, dayStreakFullText = null, dayStreakDateRange = null, dayStreakImage = null)
         }
         Log.d("SoundCapsuleVM", "Found ${playLogsInMonth.size} logs for $monthYear ($userEmail)")
@@ -191,7 +254,7 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
         val dailyAverageMinutes = if (daysInMonth > 0 && timeListenedMinutes > 0) timeListenedMinutes / daysInMonth else 0
 
         // Top Artists
-        val topArtistsStats = songDao.getTopArtistsInMonthByPlayCount(userEmail, startTimeMillis, endTimeMillis).firstOrNull() ?: emptyList()
+        val topArtistsStats = songDao.getTopArtistsInMonthByDuration(userEmail, startTimeMillis, endTimeMillis).firstOrNull() ?: emptyList()
         val topArtistEntity = topArtistsStats.firstOrNull()
         val topArtistName = topArtistEntity?.artist
         val topArtistImageUrlFromDb = topArtistName?.let { artistName ->
@@ -208,7 +271,7 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
         val totalArtistsListened = if (topArtistsStats.isNotEmpty()) topArtistsStats.size else null
 
         // Top Songs
-        val topSongsStats = songDao.getTopSongsInMonthByPlayCount(userEmail, startTimeMillis, endTimeMillis).firstOrNull() ?: emptyList()
+        val topSongsStats = songDao.getTopSongsInMonthByDuration(userEmail, startTimeMillis, endTimeMillis).firstOrNull() ?: emptyList()
         val topSongStat = topSongsStats.firstOrNull()
         val topSongName = topSongStat?.title
         val topSongImageUrl = topSongStat?.artworkUri
@@ -217,13 +280,13 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                 SongData(
                     rank = index + 1,
                     title = stats.title,
-                    artists = stats.artist, // Menggunakan SongPlayStats.artist untuk SongData.artists
+                    artists = stats.artist,
                     imageUrl = stats.artworkUri ?: "",
-                    plays = stats.playCount
+                    plays = TimeUnit.MILLISECONDS.toMinutes(stats.totalDuration).toInt()
                 )
             }
         } else null
-        val totalSongsPlayedThisMonth = if (topSongsStats.isNotEmpty()) topSongsStats.size else null // Jumlah lagu UNIK
+        val totalSongsPlayedThisMonth = if (topSongsStats.isNotEmpty()) topSongsStats.size else null
 
         // Day Streak
         var maxStreak = 0
@@ -281,9 +344,6 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
                 val sdfDate = SimpleDateFormat("MMM d", Locale.getDefault())
                 val startDateStr = sdfDate.format(streakStartDate)
                 val endDateStr = sdfDate.format(streakEndDate)
-                // Jika streak hanya satu hari (maxStreak=1), startDate dan endDate bisa sama.
-                // Tapi karena kita filter maxStreak >= 2, startDate dan endDate harusnya berbeda
-                // kecuali ada kesalahan dalam logika di atas.
                 dayStreakDateRangeStr = "$startDateStr - $endDateStr"
             }
         }
@@ -301,21 +361,32 @@ class SoundCapsuleViewModel(application: Application) : AndroidViewModel(applica
             monthYear = monthYear,
             timeListenedMinutes = if (timeListenedMinutes > 0) timeListenedMinutes else null,
             dailyAverageMinutes = if (dailyAverageMinutes > 0) dailyAverageMinutes else null,
-            topArtistName = topArtistName,
-            topArtistImageUrl = topArtistImageUrlFromDb,
-            totalArtistsListenedThisMonth = totalArtistsListened,
-            topArtistsList = topArtistsListUi,
-            topSongName = topSongName,
-            topSongImageUrl = topSongImageUrl,
-            totalSongsPlayedThisMonth = totalSongsPlayedThisMonth,
+            topArtistName = topArtistsStats.firstOrNull()?.artist,
+            topArtistImageUrl = topArtistsStats.firstOrNull()?.artist?.let { artistName ->
+                songDao.getSongsByUser(userEmail).firstOrNull()
+                    ?.find { song -> song.artist == artistName }?.artworkUri
+            },
+            totalArtistsListenedThisMonth = if (topArtistsStats.isNotEmpty()) topArtistsStats.size else null,
+            topArtistsList = if (topArtistsStats.isNotEmpty()) {
+                topArtistsStats.take(5).mapIndexed { index, stats ->
+                    val anArtistImage = songDao.getSongsByUser(userEmail).firstOrNull()
+                        ?.find { s -> s.artist == stats.artist }?.artworkUri ?: ""
+                    ArtistData(rank = index + 1, name = stats.artist, imageUrl = anArtistImage)
+                }
+            } else null,
+            topSongName = topSongsStats.firstOrNull()?.title,
+            topSongImageUrl = topSongsStats.firstOrNull()?.artworkUri,
+            totalSongsPlayedThisMonth = if (topSongsStats.isNotEmpty()) topSongsStats.size else null,
             topSongsList = topSongsListUi,
-            dayStreakCount = finalDayStreakCount,
-            dayStreakSongName = finalDayStreakSongName,
-            dayStreakSongArtist = finalDayStreakSongArtist,
-            dayStreakFullText = finalDayStreakFullText,
+            dayStreakCount = if (maxStreak >= 2) maxStreak else null,
+            dayStreakSongName = if (maxStreak >= 2) (topSongsStats.find { it.songId == streakSongId })?.title else null,
+            dayStreakSongArtist = if (maxStreak >= 2) (topSongsStats.find { it.songId == streakSongId })?.artist else null,
+            dayStreakFullText = if (maxStreak >=2 && streakSongId != null) {
+                val streakS = topSongsStats.find { it.songId == streakSongId }
+                if (streakS != null) "You listened to ${streakS.title} by ${streakS.artist} for $maxStreak consecutive days." else null
+            } else null,
             dayStreakDateRange = dayStreakDateRangeStr,
-            dayStreakImage = finalDayStreakImage
-            // hasData akan dievaluasi secara otomatis oleh data class berdasarkan nilai-nilai ini
+            dayStreakImage = if (maxStreak >=2) (topSongsStats.find { it.songId == streakSongId })?.artworkUri else null
         )
     }
 

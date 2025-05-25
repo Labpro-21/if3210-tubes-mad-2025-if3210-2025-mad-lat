@@ -71,8 +71,9 @@ class MusicPlaybackService : Service() {
     private val _queue = mutableListOf<Song>()
     val queue: List<Song> get() = _queue
 
-    private var currentSongStartTimeMillis: Long = 0L
-    private val MIN_PLAY_DURATION_FOR_LOG_MS = 30000
+    private var currentSessionListenedDurationMillis: Long = 0L
+    private var lastPlayTimestamp: Long = 0L
+    private val MIN_PLAY_DURATION_FOR_LOG_MS = 1000
 
     private val _playbackMode = MutableStateFlow(PlaybackMode.REPEAT)
     val playbackMode: StateFlow<PlaybackMode> = _playbackMode
@@ -357,7 +358,8 @@ class MusicPlaybackService : Service() {
         logCurrentSongPlayDuration(musicDbViewModel)
 
         _currentSong.value = song
-        currentSongStartTimeMillis = System.currentTimeMillis()
+        currentSessionListenedDurationMillis = 0L
+        lastPlayTimestamp = System.currentTimeMillis()
         currentIndex = _playlist.indexOfFirst { it.uri == song.uri }
         try {
             mediaPlayer?.release()
@@ -369,11 +371,12 @@ class MusicPlaybackService : Service() {
                     setDataSource(this@MusicPlaybackService, uri)
                 }
                 prepareAsync()
-                setOnPreparedListener {
+                setOnPreparedListener { mp ->
                     logCurrentSongPlayDuration(musicDbViewModel, isCompletion = true)
-                    start()
+                    mp.start()
                     _duration.value = duration
                     _isPlaying.value = true
+                    lastPlayTimestamp = System.currentTimeMillis()
                     if (!isEmulator) {
                         _currentAudioDevice.value?.let { device ->
                             if (device.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
@@ -384,8 +387,10 @@ class MusicPlaybackService : Service() {
                             }
                         }
                     }
+                    musicDbViewModel.updateSongTimestamp(song)
                 }
                 setOnCompletionListener {
+                    updateAndLogDurationOnEvent(musicDbViewModel)
                     playNext(musicDbViewModel, onlineSongsViewModel)
                 }
                 setOnErrorListener { _, what, extra ->
@@ -404,6 +409,20 @@ class MusicPlaybackService : Service() {
         }
     }
 
+    private fun updateCurrentSessionListenedDuration() {
+        if (_isPlaying.value && lastPlayTimestamp > 0) {
+            val elapsed = System.currentTimeMillis() - lastPlayTimestamp
+            currentSessionListenedDurationMillis += elapsed
+            lastPlayTimestamp = System.currentTimeMillis()
+        }
+    }
+
+    private fun updateAndLogDurationOnEvent(musicDbViewModel: MusicDbViewModel) {
+        updateCurrentSessionListenedDuration()
+        logCurrentSongPlayDuration(musicDbViewModel)
+        currentSessionListenedDurationMillis = 0L
+    }
+
     private fun logCurrentSongPlayDuration(musicDbViewModel: MusicDbViewModel, isCompletion: Boolean = false) {
         val songToLog = _currentSong.value
         val mediaPlayerInstance = mediaPlayer
@@ -413,64 +432,54 @@ class MusicPlaybackService : Service() {
             return
         }
 
-        // Check if the song exists in the database
-        serviceScope.launch(Dispatchers.IO) {
-            val songExists = musicDbViewModel.isSongExists(songToLog.id)
-            if (!songExists) {
-                Log.d("MusicBehaviorVM", "Skipping log: song with id ${songToLog.id} does not exist in database")
-                return@launch
-            }
+        val finalDurationToLog = currentSessionListenedDurationMillis.coerceAtMost(songToLog.duration)
 
-            val endTimeMillis = System.currentTimeMillis()
-            var listenedDurationMillis = 0L
-
-            try {
-                listenedDurationMillis = if (isCompletion) {
-                    (endTimeMillis - currentSongStartTimeMillis).coerceAtMost(songToLog.duration)
-                } else {
-                    (endTimeMillis - currentSongStartTimeMillis).coerceAtLeast(0)
+        if (finalDurationToLog >= MIN_PLAY_DURATION_FOR_LOG_MS) {
+            serviceScope.launch(Dispatchers.IO) {
+                val songExists = musicDbViewModel.isSongExists(songToLog.id)
+                if (!songExists) {
+                    Log.d("MusicPlaybackService", "Skipping log: song with id ${songToLog.id} does not exist in database")
+                    return@launch
                 }
-                // Ensure listened duration isn't negative or excessively large
-                listenedDurationMillis = listenedDurationMillis.coerceIn(0, songToLog.duration)
 
-            } catch (e: IllegalStateException) {
-                // MediaPlayer might be in an invalid state
-                Log.e("MusicBehaviorVM", "Error getting current position for logging: ${e.message}")
-                listenedDurationMillis = endTimeMillis - currentSongStartTimeMillis // Fallback
-            }
+                val userEmail = DataKeeper.email
+                if (userEmail.isNullOrBlank()) {
+                    Log.e("MusicPlaybackService", "Skipping log: User email is null or blank")
+                    return@launch
+                }
 
-            if (listenedDurationMillis >= MIN_PLAY_DURATION_FOR_LOG_MS) {
-                val userEmail = DataKeeper.email ?: return@launch // Should not be null
                 val playLog = SongPlayLogEntity(
                     songId = songToLog.id,
                     userEmail = userEmail,
                     playedAtTimestamp = System.currentTimeMillis(),
-                    durationListenedMillis = listenedDurationMillis,
+                    durationListenedMillis = finalDurationToLog,
                     isLocal = true
                 )
                 musicDbViewModel.insertSongPlayLog(playLog)
-                Log.d("MusicBehaviorVM", "Logged play: ${songToLog.title}, Duration: $listenedDurationMillis ms")
-
-                musicDbViewModel.updateSongTimestamp(songToLog)
+                Log.d("MusicPlaybackService", "Logged play: ${songToLog.title}, Actual Duration Listened: $finalDurationToLog ms, Played At: ${playLog.playedAtTimestamp}")
             }
+        } else {
+            Log.d("MusicPlaybackService", "Skipping log for ${songToLog.title}: duration $finalDurationToLog ms < $MIN_PLAY_DURATION_FOR_LOG_MS ms")
         }
-        currentSongStartTimeMillis = 0L
     }
 
     fun togglePlayPause(musicDbViewModel: MusicDbViewModel) {
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) {
-                    logCurrentSongPlayDuration(musicDbViewModel)
+                    updateAndLogDurationOnEvent(musicDbViewModel)
                     it.pause()
                     _isPlaying.value = false
+                    lastPlayTimestamp = 0L
                 } else {
-                    currentSongStartTimeMillis = System.currentTimeMillis() - it.currentPosition
+                    // Lagu di-resume
+                    lastPlayTimestamp = System.currentTimeMillis()
                     it.start()
                     _isPlaying.value = true
                 }
             } catch (e: IllegalStateException) {
                 _audioError.value = "Playback state error: ${e.message}"
+                updateAndLogDurationOnEvent(musicDbViewModel)
             }
         }
     }
@@ -513,7 +522,7 @@ class MusicPlaybackService : Service() {
     }
 
     fun playNext(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
-        logCurrentSongPlayDuration(musicDbViewModel)
+        updateAndLogDurationOnEvent(musicDbViewModel) // Log lagu saat ini sebelum pindah
         if (_queue.isNotEmpty()) {
             val nextFromQueue = _queue.removeAt(0)
             playSong(nextFromQueue, musicDbViewModel, onlineSongsViewModel)
@@ -574,7 +583,7 @@ class MusicPlaybackService : Service() {
     }
 
     fun playPrevious(musicDbViewModel: MusicDbViewModel, onlineSongsViewModel: OnlineSongsViewModel) {
-        logCurrentSongPlayDuration(musicDbViewModel)
+        updateAndLogDurationOnEvent(musicDbViewModel)
 
         val list = _playlist
 
@@ -659,7 +668,7 @@ class MusicPlaybackService : Service() {
     }
 
     fun stopPlayback(musicDbViewModel: MusicDbViewModel) {
-        logCurrentSongPlayDuration(musicDbViewModel)
+        updateAndLogDurationOnEvent(musicDbViewModel)
         mediaPlayer?.apply {
             if (isPlaying) {
                 stop()
