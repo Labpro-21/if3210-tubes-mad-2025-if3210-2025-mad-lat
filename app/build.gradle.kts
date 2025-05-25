@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
     id("org.jetbrains.kotlin.plugin.compose")
+    id ("kotlin-parcelize")
 }
 
 android {
@@ -109,5 +110,6 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.0")
+    implementation("androidx.media:media:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
