@@ -1237,13 +1237,23 @@ class MusicPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener 
                     logCurrentSongPlayDuration(musicDbViewModel)
                     it.pause()
                     _isPlaying.value = false
+                    updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, it.currentPosition.toLong())
+                    updateNotification()
+                    stopForeground(false)
+                    progressUpdateJob?.cancel()
                 } else {
                     currentSongStartTimeMillis = System.currentTimeMillis() - it.currentPosition
                     it.start()
                     _isPlaying.value = true
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, it.currentPosition.toLong())
+                    startForegroundNotificationAndUpdate()
+                    startProgressUpdater()
                 }
             } catch (e: IllegalStateException) {
                 _audioError.value = "Playback state error: ${e.message}"
+                _isPlaying.value = false
+                updatePlaybackState(PlaybackStateCompat.STATE_ERROR, mediaPlayer?.currentPosition?.toLong() ?: 0L)
+                updateNotification()
             }
         }
     }
