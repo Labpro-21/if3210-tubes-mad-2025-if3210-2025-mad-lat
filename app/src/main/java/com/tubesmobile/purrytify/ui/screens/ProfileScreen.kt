@@ -286,19 +286,19 @@ fun ProfileContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex-- },
-                        enabled = currentCapsuleIndex > 0
+                        onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++},
+                        enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
                     ) {
                         Icon(Icons.Filled.ArrowBackIosNew, "Previous Month",
-                            tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                            tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
                     }
                     Text(currentCapsuleToDisplay.monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     IconButton(
-                        onClick = { if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) currentCapsuleIndex++ },
-                        enabled = currentCapsuleIndex < monthlyCapsulesFromVM.size - 1
+                        onClick = { if (currentCapsuleIndex > 0) currentCapsuleIndex--  },
+                        enabled = currentCapsuleIndex > 0
                     ) {
                         Icon(Icons.Filled.ArrowForwardIos, "Next Month",
-                            tint = if (currentCapsuleIndex < monthlyCapsulesFromVM.size - 1) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
+                            tint = if (currentCapsuleIndex > 0) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f))
                     }
                 }
 
